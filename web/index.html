@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mMST — mixed-choice session types</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23002b36'/%3E%3Cpath d='M6 9h20M6 23h20' stroke='%2393a1a1' stroke-opacity='.6' stroke-width='1.5'/%3E%3Cpath d='M9 9l14 14' stroke='%232aa198' stroke-width='3'/%3E%3Cpath d='M9 23l14-14' stroke='%23b58900' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="theme.css">
+<script src="vendor/marked.umd.js"></script>
+<script src="shared.js"></script>
+<style>
+/* panes: side by side when wide, stacked when narrow; split.js moves the gutter */
+body{height:100vh}
+main{flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,calc(var(--split,50) * 1%)) 1px minmax(0,1fr)}
+@media (max-width:900px){
+  body{height:auto}
+  main{grid-template-columns:1fr; grid-template-rows:var(--top,50vh) 1px auto}
+}
+.pane{display:flex; flex-direction:column; min-width:0; min-height:0}
+.gutter{position:relative; z-index:3; background:var(--rule-2); cursor:col-resize; touch-action:none}
+.gutter::before{content:""; position:absolute; inset:0 -6px}
+.gutter::after{content:""; position:absolute; inset:0 -1px; background:var(--accent); opacity:0; transition:opacity .12s}
+.gutter:hover::after, .gutter:focus-visible::after, body.resizing .gutter::after{opacity:1}
+.gutter:focus-visible{outline:0}
+@media (max-width:900px){
+  .gutter{cursor:row-resize}
+  .gutter::before{inset:-6px 0}
+  .gutter::after{inset:-1px 0}
+}
+body.resizing{-webkit-user-select:none; user-select:none}
+body.resizing.cols, body.resizing.cols *{cursor:col-resize !important}
+body.resizing.rows, body.resizing.rows *{cursor:row-resize !important}
+.pane-head{
+  height:42px; flex:none; display:flex; align-items:center; gap:.6rem; padding:0 clamp(12px,2vw,18px);
+  border-bottom:1px solid var(--rule); background:var(--head);
+  font-size:.8rem; color:var(--head-ink);
+}
+.pane-head .right{margin-left:auto; display:flex; gap:.5rem; align-items:center; text-transform:none; letter-spacing:0}
+.pane-head .file{color:var(--ink-3)}
+.pane-head .status{font-size:.7rem; color:var(--ink-3)}
+.pane-head .btn.primary{padding:.34rem .8rem}
+
+/* view tabs */
+.tabs{display:inline-flex; border:1px solid var(--rule-2); border-radius:0; overflow:hidden; background:var(--paper)}
+.tabs button{
+  font-family:var(--mono); font-size:.74rem; letter-spacing:.04em; padding:.32rem .75rem;
+  border:0; background:transparent; color:var(--ink-2); cursor:pointer;
+}
+.tabs button + button{border-left:1px solid var(--rule-2)}
+.tabs button[aria-selected="true"]{background:var(--tab-on); color:var(--tab-on-ink)}
+.tabs button:hover:not([aria-selected="true"]){color:var(--accent)}
+.tabs button[disabled]{opacity:.55; cursor:progress}
+
+.pane-body{flex:1; overflow:auto; min-height:0}
+/* editor: line numbers (.lnum, shared.js) | highlighted text under a transparent textarea */
+.pane-body.editor{position:relative; overflow:hidden; --ln:2ch; --lnw:calc(var(--ln) + 1.3rem + 1px)}
+.pane-body.editor pre.hl, .pane-body.editor textarea{
+  position:absolute; top:0; bottom:0; left:var(--lnw); margin:0; width:calc(100% - var(--lnw)); height:100%;
+  padding:1rem clamp(12px,2vw,18px) 1rem .8rem;
+  font-family:var(--mono); font-size:13.5px; line-height:1.62; tab-size:4;
+  white-space:pre; overflow:auto; border:0;
+}
+.pane-body.editor .lnum{
+  position:absolute; top:0; bottom:0; left:0; width:var(--lnw); overflow:hidden;
+  font-family:var(--mono); font-size:13.5px; line-height:1.62; color:var(--ink-3);
+  background:var(--paper); border-right:1px solid var(--rule); user-select:none; -webkit-user-select:none;
+}
+.pane-body.editor .lnum > div{padding:1rem .65rem 1rem 0; text-align:right; white-space:pre}
+.pane-body.editor .lnum .eline{color:var(--fail); font-weight:700}
+.pane-body.editor .lnum .esoft{color:var(--ink-2)}
+.pane-body.editor pre.hl{color:var(--ink-2); background:var(--paper); pointer-events:none}
+.pane-body.editor pre.hl code{white-space:inherit; font:inherit}
+.pane-body.editor textarea{resize:none; outline:none; background:transparent; color:transparent; caret-color:var(--ink)}
+
+/* modes */
+main[hidden], header select[hidden]{display:none}
+.modes{display:inline-flex; flex:none; border:1px solid var(--bar-rule); border-radius:0; overflow:hidden}
+.modes button{
+  font-family:var(--mono); font-size:.72rem; letter-spacing:.06em; padding:.38rem .85rem;
+  border:0; background:transparent; color:var(--bar-ink-2); cursor:pointer;
+}
+.modes button + button{border-left:1px solid var(--bar-rule)}
+.modes button[aria-selected="true"]{background:var(--bar-ink); color:var(--bar); font-weight:700}
+.modes button:hover:not([aria-selected="true"]){color:var(--bar-ink); background:var(--paper)}
+
+/* erlang mode */
+@media (max-width:900px){ #erlang-main{grid-template-rows:var(--top,62vh) 1px auto} }
+.pane-head .file{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pane-head .btn{white-space:nowrap}
+@media (max-width:600px){ .pane-head .btn:not(.primary){padding:.3rem .5rem; font-size:.7rem} }
+.erl-files{
+  flex:none; display:flex; flex-wrap:wrap; gap:.3rem; align-items:center;
+  padding:.5rem clamp(12px,2vw,18px); border-bottom:1px solid var(--rule); background:var(--paper);
+}
+.erl-files button{
+  font-family:var(--mono); font-size:.72rem; padding:.22rem .5rem; border-radius:0; cursor:pointer;
+  border:1px solid var(--rule-2); background:var(--paper); color:var(--ink-2); white-space:nowrap;
+}
+.erl-files button:hover{border-color:var(--lhs); color:var(--lhs)}
+.erl-files button[aria-current="true"]{background:var(--lhs); border-color:var(--lhs); color:var(--paper)}
+.erl-files button.k4{border-style:dashed; color:var(--ink-3)}
+.erl-files button.k4[aria-current="true"]{border-style:solid; color:var(--paper)}
+.erl-files button.edited::after{content:" \2022"; color:var(--rhs); font-weight:700}
+.erl-files button.edited[aria-current="true"]::after{color:var(--hl)}
+.erl-files button.bad{border-color:var(--fail); color:var(--fail)}
+.erl-files button.bad[aria-current="true"]{background:var(--fail-fill); border-color:var(--fail-fill); color:var(--fail-on)}
+.erl-files .gap{width:.45rem; flex:none}
+.erl-files button.undo{border:0; background:none; color:var(--ink-3); padding:.22rem 0; margin-left:auto; text-decoration:underline; text-underline-offset:2px}
+@media (max-width:900px){ .erl-files{flex-wrap:nowrap; overflow-x:auto} }
+.pane-body.editor mark.eline{background:var(--mark); color:inherit; box-shadow:0 0 0 2px var(--mark)}
+.pane-body.editor mark.esoft{background:var(--mark-soft); color:inherit; box-shadow:0 0 0 2px var(--mark-soft)}
+
+.verdict .tag.wait{color:var(--rhs)}
+.rc0{color:var(--lhs)} .rc1{color:var(--rhs)} .rc2{color:var(--ink-2)} .rc3{color:var(--ink-3)}
+.hintline .rc{font-family:var(--mono); font-size:.88em; font-weight:700}
+.msg a[data-protocol]{color:var(--lhs); text-decoration:underline; text-underline-offset:2px}
+.msg code{font-family:var(--mono); font-size:.88em; background:var(--sunk); padding:.08em .3em; border-radius:0}
+.msg .msg-do{display:flex; flex-wrap:wrap; gap:.4rem .8rem; align-items:center; margin-top:.7rem; font-size:.84rem; color:var(--ink-3)}
+
+ul.erl-roles{list-style:none; margin:0 0 1.1rem; padding:0; max-width:46rem}
+ul.erl-roles li{display:flex; flex-wrap:wrap; align-items:baseline; gap:.15rem .9rem; padding:.45rem 0; border-bottom:1px solid var(--rule)}
+ul.erl-roles b{font-family:var(--mono); font-size:.82rem; min-width:7rem}
+ul.erl-roles .alias{font-weight:400; font-size:.72rem; color:var(--ink-3)}
+ul.erl-roles .st{font-family:var(--mono); font-size:.78rem; letter-spacing:.05em; font-weight:700}
+ul.erl-roles .st code{font-family:var(--mono); background:var(--sunk); padding:.05em .3em; border-radius:0}
+ul.erl-roles li.finished .st{color:var(--pass)}
+ul.erl-roles li.waiting .st{color:var(--rhs)}
+ul.erl-roles li.crashed .st, ul.erl-roles li.failed .st{color:var(--fail)}
+ul.erl-roles .more{font-family:var(--mono); font-size:.76rem; color:var(--ink-2)}
+ul.erl-roles li.crashed .more, ul.erl-roles li.failed .more{flex-basis:100%; padding-left:7.9rem; word-break:break-word}
+@media (max-width:600px){ ul.erl-roles li.crashed .more, ul.erl-roles li.failed .more{padding-left:0} }
+
+button.loc{
+  font-family:var(--mono); font-size:.8rem; background:none; border:0; padding:0; cursor:pointer;
+  color:var(--fail); text-decoration:underline; text-underline-offset:2px;
+}
+ul.erl-roles button.loc{font-size:inherit; color:inherit}
+ul.erl-problems{list-style:none; margin:.3rem 0 1.1rem; padding:0; max-width:52rem}
+ul.erl-problems li{padding:.34rem 0; border-bottom:1px solid var(--rule); color:var(--ink); font-size:.88rem}
+ul.erl-problems code{font-family:var(--mono); font-size:.8rem}
+ul.erl-problems.warnings li{color:var(--ink-2)}
+ul.erl-problems.warnings button.loc{color:var(--rhs)}
+details.raw ul.erl-problems{margin-top:.6rem}
+
+.erl-logbar{display:flex; align-items:baseline; gap:1rem; margin:1.5rem 0 .5rem}
+.erl-logbar h3.sec{margin:0}
+.erl-logbar label{display:inline-flex; gap:.35rem; align-items:center; font-size:.8rem; color:var(--ink-2); cursor:pointer}
+.erl-logbar .n{color:var(--ink-3)}
+.erl-log{
+  font-family:var(--mono); font-size:.74rem; line-height:1.6; color:var(--ink);
+  background:var(--sunk); border:1px solid var(--rule); border-radius:0; padding:.55rem 0;
+  overflow:auto; max-height:30rem;
+}
+.erl-log .ln, .erl-log summary{display:flex; gap:.8rem; padding:0 .9rem; white-space:pre; width:max-content; min-width:100%}
+.erl-log .who{flex:none; width:var(--who,8ch); text-align:right; font-weight:700; overflow:hidden; text-overflow:ellipsis}
+.erl-log .dbg{display:none}
+.erl-log.trace .dbg{display:flex}
+.erl-log .dbg .tx{color:var(--ink-3)}
+.erl-log details.rep summary{cursor:pointer; list-style:none; color:var(--fail)}
+.erl-log details.rep summary::-webkit-details-marker{display:none}
+.erl-log details.rep summary .tx::before{content:"\25B8  "}
+.erl-log details.rep[open] summary .tx::before{content:"\25BE  "}
+.erl-log details.rep pre{margin:.15rem .9rem .5rem calc(var(--who,8ch) + 1.7rem); font:inherit; white-space:pre; color:var(--ink-2)}
+.files-bar{display:flex; flex-wrap:wrap; gap:.5rem 1rem; align-items:center; justify-content:space-between;
+  padding:.8rem clamp(12px,2vw,18px) 0; color:var(--ink-2); font-size:.86rem}
+.files-bar code{font-family:var(--mono); font-size:.9em; background:var(--sunk); padding:.08em .3em; border-radius:0}
+
+/* result */
+.result{padding:1rem clamp(12px,2vw,18px) 2.5rem}
+.verdict{
+  display:flex; align-items:baseline; gap:.7rem; margin:0 0 1rem; flex-wrap:wrap;
+  font-size:.82rem; text-transform:uppercase;
+}
+.verdict .tag{font-weight:700}
+.verdict .tag::before{content:"[\00a0"; color:var(--ink-3); font-weight:400}
+.verdict .tag::after{content:"\00a0]"; color:var(--ink-3); font-weight:400}
+.verdict .tag.ok{color:var(--pass)}
+.verdict .tag.no{color:var(--fail)}
+.verdict .name{color:var(--ink-3); letter-spacing:.02em; text-transform:none; font-size:.8rem}
+
+ul.flags{list-style:none; margin:0 0 1.4rem; padding:0; max-width:46rem}
+ul.flags li{
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:.7rem; padding:.42rem 0;
+  border-bottom:1px solid var(--rule); font-family:var(--mono); font-size:.84rem;
+}
+ul.flags li b{min-width:2.2em; font-weight:600}
+ul.flags li .nm{color:var(--ink-2); font-family:var(--sans); font-size:.92rem}
+ul.flags li .dots{flex:1; border-bottom:1px dotted var(--rule-2); transform:translateY(-.25em)}
+ul.flags li .v{font-weight:600; letter-spacing:.08em}
+ul.flags li .v.p{color:var(--pass)} ul.flags li .v.f{color:var(--fail)}
+ul.flags li.first-fail b{color:var(--fail)}
+
+/* where it fails: a line per construct; line numbers jump to the editor */
+.where{font-family:var(--mono); font-size:.8rem; line-height:1.5; color:var(--ink-2)}
+.where div{padding:.12rem 0 .12rem 5em; text-indent:-5em}
+.where code{font-family:var(--mono); font-size:1em; color:var(--ink); background:none; padding:0}
+.where code.hd{margin-right:.4em}
+.where button.loc{font-size:1em}
+.where .ln{display:inline-block; min-width:5em; text-indent:0}
+ul.flags .where{flex-basis:100%; margin:0 0 0 2.9em}
+.msg .where{margin:.2rem 0 .7rem}
+.msg .where:last-child{margin-bottom:0}
+.hintline{max-width:46rem; color:var(--ink-2); margin:0 0 1rem}
+.hintline b{color:var(--ink)}
+.hintline code{font-family:var(--mono); font-size:.9em; background:var(--sunk); padding:.1em .35em; border-radius:0}
+
+ul.locals{list-style:none; margin:0; padding:0}
+ul.locals li{padding:.5rem 0; border-bottom:1px solid var(--rule)}
+ul.locals .role{
+  font-family:var(--mono); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--lhs);
+  display:block; margin-bottom:.2rem;
+}
+ul.locals .ty{
+  font-family:var(--mono); font-size:.82rem; line-height:1.6; color:var(--ink);
+  overflow-x:auto; white-space:pre; display:block; padding-bottom:.25rem;
+}
+
+.msg{
+  max-width:46rem; background:var(--card); border:1px solid var(--rule);
+  border-left:3px solid var(--rhs); border-radius:0; padding:.9rem 1.1rem; margin:0 0 1.2rem;
+  color:var(--ink-2);
+}
+.msg .t{
+  font-family:var(--mono); font-size:.68rem; letter-spacing:.13em; text-transform:uppercase;
+  color:var(--rhs); margin-bottom:.4rem;
+}
+.msg.wait{border-left-color:var(--lhs)} .msg.wait .t{color:var(--lhs)}
+
+details.raw{margin-top:1.7rem}
+details.raw summary{
+  font-family:var(--mono); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3); cursor:pointer; list-style:none;
+}
+details.raw summary::-webkit-details-marker{display:none}
+details.raw summary::before{content:"\25B8 "; color:var(--rhs)}
+details.raw[open] summary::before{content:"\25BE "}
+pre.raw{
+  font-family:var(--mono); font-size:.72rem; line-height:1.55; background:var(--sunk);
+  border:1px solid var(--rule); border-radius:0; padding:.8rem 1rem; margin:.6rem 0 0;
+  overflow-x:auto; max-height:22rem; color:var(--ink-2);
+}
+
+/* erlang view */
+.files{display:flex; gap:.3rem; flex-wrap:wrap; padding:.8rem clamp(12px,2vw,18px) 0}
+.files button{
+  font-family:var(--mono); font-size:.72rem; padding:.25rem .5rem; border-radius:0;
+  border:1px solid var(--rule-2); background:var(--paper); cursor:pointer; color:var(--ink-2);
+}
+.files button.on{background:var(--lhs); border-color:var(--lhs); color:var(--paper)}
+
+/* efsm */
+.efsm{padding:.9rem clamp(12px,2vw,18px) 2rem}
+.efsm-top{display:flex; flex-wrap:wrap; gap:.6rem 1rem; align-items:center; justify-content:space-between; margin:0 0 .5rem}
+.efsm-roles{display:flex; gap:.3rem; flex-wrap:wrap}
+.efsm-roles button{
+  font-family:var(--mono); font-size:.74rem; padding:.28rem .7rem; border-radius:0;
+  border:1px solid var(--rule-2); background:var(--paper); color:var(--ink-2); cursor:pointer;
+}
+.efsm-roles button[aria-selected="true"]{background:var(--lhs); border-color:var(--lhs); color:var(--paper)}
+.efsm-ctl{display:flex; gap:.35rem}
+.efsm-ctl .btn{padding:.3rem .6rem; font-size:.74rem}
+.efsm-note{color:var(--ink-2); font-size:.88rem; margin:.1rem 0 .7rem; max-width:46rem}
+.efsm-canvas{overflow-x:auto; border:1px solid var(--rule); border-radius:0; background:var(--card)}
+.efsm-svg{display:block; height:auto; margin:0 auto}
+.efsm-svg .tr{fill:none; stroke-width:1.8; stroke-linecap:round}
+.efsm-svg .tr.lhs{stroke:var(--lhs)}
+.efsm-svg .tr.rhs{stroke:var(--rhs)}
+.efsm-svg .tr.none{stroke:var(--ink-3)}
+.efsm-svg .tr.jump{stroke:var(--ink-3); stroke-dasharray:5 4}
+.efsm-svg .tr.switch{stroke-width:2.4}
+.efsm-svg .tr.next{stroke-width:3.2}
+.efsm-svg .tr.hot{stroke:var(--hl); stroke-width:3.4}
+.efsm-svg .ah.lhs{fill:var(--lhs)}
+.efsm-svg .ah.rhs{fill:var(--rhs)}
+.efsm-svg .ah.none, .efsm-svg .ah.jump{fill:var(--ink-3)}
+.efsm-svg .hit{fill:none; stroke:transparent; stroke-width:16}
+.efsm-svg .hit.next{cursor:pointer}
+.efsm-svg .lbl rect{fill:var(--paper); stroke:var(--rule); stroke-width:1}
+.efsm-svg .lbl text{font-family:var(--mono); font-size:10.5px; text-anchor:middle; fill:var(--ink-2)}
+.efsm-svg .lbl .ev{font-weight:700; fill:var(--ink)}
+.efsm-svg .lbl.lhs .ev{fill:var(--lhs)}
+.efsm-svg .lbl.rhs .ev{fill:var(--rhs)}
+.efsm-svg .lbl.next{cursor:pointer}
+.efsm-svg .lbl.next rect{stroke:var(--hl-edge); stroke-width:2}
+.efsm-svg .lbl.hot rect{fill:var(--hl); stroke:var(--hl-edge)}
+.efsm-svg .lbl.hot text{fill:var(--hl-on)}
+.efsm-svg .note{font-family:var(--mono); font-size:10px; fill:var(--ink-3)}
+.efsm-svg .st .ring{fill:var(--paper); stroke:var(--ink-3); stroke-width:1.6}
+.efsm-svg .st.start .ring{stroke:var(--ink)}
+.efsm-svg .st.entry .ring{stroke:var(--accent); stroke-width:2.8}
+.efsm-svg .st .inner{fill:none; stroke:var(--ink-3); stroke-width:1.3}
+.efsm-svg .st.cont .ring{stroke-dasharray:4 3}
+.efsm-svg .st .halo{fill:none; stroke:var(--hl); stroke-width:3; opacity:0}
+.efsm-svg .sid{font-family:var(--mono); font-size:11.5px; font-weight:700; text-anchor:middle; fill:var(--ink)}
+.efsm-svg .badge{font-family:var(--mono); font-size:10px; text-anchor:middle; fill:var(--accent)}
+.efsm-svg .st.cur .ring{fill:var(--hl); stroke:var(--hl-edge); stroke-width:2.4}
+.efsm-svg .st.cur .sid{fill:var(--hl-on)}
+.efsm-svg .st.cur .halo{animation:efsmPulse 1.4s ease-out infinite; transform-box:fill-box; transform-origin:center}
+.efsm-svg .token{fill:var(--hl); stroke:var(--hl-on); stroke-width:1.6; opacity:0; pointer-events:none}
+.efsm-svg .token.on{opacity:1}
+@keyframes efsmPulse{ 0%{opacity:.85; transform:scale(.85)} 100%{opacity:0; transform:scale(1.35)} }
+@media (prefers-reduced-motion:reduce){ .efsm-svg .st.cur .halo{animation:none; opacity:.8} }
+.efsm-trace{display:flex; gap:.6rem; align-items:baseline; margin:.8rem 0 0; flex-wrap:wrap}
+.efsm-trace .lead{font-family:var(--mono); font-size:.66rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent)}
+.efsm-trace ol{list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:.3rem}
+.efsm-trace li{
+  font-family:var(--mono); font-size:.74rem; padding:.16rem .45rem; border-radius:0;
+  background:var(--sunk); color:var(--ink); border-left:3px solid var(--ink-3);
+}
+.efsm-trace li.lhs{border-left-color:var(--lhs)}
+.efsm-trace li.rhs{border-left-color:var(--rhs)}
+.efsm-trace li.jump{border-left-style:dashed}
+.efsm-trace li.end, .efsm-trace li.empty{background:transparent; border-left:0; color:var(--ink-3)}
+.efsm-trace li.empty{font-family:var(--sans)}
+.efsm-legend{display:flex; flex-wrap:wrap; gap:.35rem 1.2rem; margin:1rem 0 0; font-size:.78rem; color:var(--ink-2)}
+.efsm-legend code{font-family:var(--mono); font-size:.92em; color:var(--ink)}
+.efsm-legend .row{flex-basis:100%}
+.efsm-legend .sw{display:inline-block; width:22px; vertical-align:middle; margin-right:.4rem; border-top:2.5px solid var(--ink-3)}
+.efsm-legend .sw.lhs{border-top-color:var(--lhs)}
+.efsm-legend .sw.rhs{border-top-color:var(--rhs)}
+.efsm-legend .sw.jump{border-top-style:dashed}
+
+</style>
+</head>
+<body>
+
+<!-- The rest of the bar comes from header.html (shared.js). -->
+<header id="site-header">
+  <span class="modes" role="tablist" aria-label="Mode">
+    <button role="tab" data-mode="protocol" aria-selected="true" title="Check a protocol">Protocol</button>
+    <button role="tab" data-mode="erlang" aria-selected="false" title="Edit and run Erlang">Erlang</button>
+  </span>
+  <select id="examples" title="Load a protocol"><option value="">Load a protocol&hellip;</option></select>
+  <select id="erlsets" title="Open Erlang" hidden><option value="">Open Erlang&hellip;</option></select>
+</header>
+
+<main id="protocol-main">
+  <section class="pane" id="protocol-left">
+    <div class="pane-head">
+      <span>protocol</span><span class="file" id="modname"></span>
+      <span class="right">
+        <span class="status" id="status" aria-live="polite"></span>
+        <button class="btn primary" id="check" title="Validate and project">Check <kbd id="kbdhint"></kbd></button>
+      </span>
+    </div>
+    <div class="pane-body editor">
+      <pre class="hl" aria-hidden="true"><code id="hl"></code></pre>
+      <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"></textarea>
+    </div>
+  </section>
+
+  <div class="gutter" role="separator" tabindex="0" aria-controls="protocol-left" aria-label="Resize panes" title="Drag to resize; double-click to reset"></div>
+
+  <section class="pane">
+    <div class="pane-head">
+      <span id="resultTitle">checks</span>
+      <span class="right">
+        <span class="tabs" role="tablist" aria-label="What to show">
+          <button role="tab" data-view="checks" aria-selected="true" title="Checks and local types">Checks</button>
+          <button role="tab" data-view="efsm" aria-selected="false" title="State machine per role">EFSM</button>
+          <button role="tab" data-view="erlang" aria-selected="false" title="Generated modules">Erlang</button>
+        </span>
+      </span>
+    </div>
+    <div class="pane-body" id="out"></div>
+  </section>
+</main>
+
+<main id="erlang-main" hidden>
+  <section class="pane" id="erlang-left">
+    <div class="pane-head">
+      <span>erlang</span><span class="file" id="erl-where"></span>
+      <span class="right">
+        <button class="btn" id="erl-reset" title="Revert this file" disabled>Reset file</button>
+        <button class="btn" id="erl-zip" title="Download as .zip">.zip</button>
+      </span>
+    </div>
+    <div class="erl-files" id="erl-files" aria-label="Files"></div>
+    <div class="pane-body editor">
+      <pre class="hl" aria-hidden="true"><code id="erl-hl"></code></pre>
+      <textarea id="erl-src" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="Erlang source"></textarea>
+    </div>
+  </section>
+
+  <div class="gutter" role="separator" tabindex="0" aria-controls="erlang-left" aria-label="Resize panes" title="Drag to resize; double-click to reset"></div>
+
+  <section class="pane">
+    <div class="pane-head">
+      <span id="erl-title">run</span>
+      <span class="right">
+        <span class="status" id="erl-status" aria-live="polite"></span>
+        <button class="btn primary" id="erl-run" title="Compile and run">Run <kbd class="kbd"></kbd></button>
+      </span>
+    </div>
+    <div class="pane-body" id="erl-out"></div>
+  </section>
+</main>
+
+<footer class="site" id="site-footer"></footer>
+
+<script src="split.js"></script>
+<script src="efsm.js"></script>
+<script src="examples.js"></script>
+<script src="erlang.js"></script>
+<script src="playground.js"></script>
+</body>
+</html>

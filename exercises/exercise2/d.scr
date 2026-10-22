@@ -1,0 +1,14 @@
+module d;
+
+// BROKEN. No mixed choice: an ordinary directed choice.
+// Predict what fails, and for whom. Then press Check, compare, and fix it.
+
+global protocol Choice(role p, role q, role r) {
+    choice at p {
+        a() from p to q;
+        c() from q to r;
+    } or {
+        b() from p to q;
+        c() from q to p;
+    }
+}

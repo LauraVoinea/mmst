@@ -1,0 +1,23 @@
+module StreamCancel;
+
+// Add in recursion. Valid as it stands.
+//
+// A streaming RPC that sends one chunk and stops. Make Server send chunks
+// until Client cancels, with rec Name { ... continue Name; }. Keep all four
+// flags green.
+//
+// Then predict what fails, and for whom, check, and explain:
+//   1. the rec inside the left side, around its three messages only;
+//   2. Metrics told only about the cancel: no counted().
+
+global protocol StreamCancel(role Client, role Server, role Metrics) {
+    request() from Client to Server;
+    mixed {
+        chunk() from Server to Client;
+        more() from Client to Server;
+        counted() from Server to Metrics;
+    } or Server -> Client {
+        cancel() from Client to Server;
+        cancelled() from Server to Metrics;
+    }
+}
