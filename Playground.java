@@ -72,18 +72,21 @@ public final class Playground {
 
     private static Path webroot;
 
-    // Menu sources: exerciseN/ folders, and the checker's examples/scribble.
-    private static Path exercises, artifactExamples;
+    // Menu sources: exerciseN/ folders, the GROUPS folders, and the checker's examples/scribble.
+    private static Path exercises, groupRoot, artifactExamples;
 
     public static void main(String[] args) throws IOException {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 8080;
         webroot  = Paths.get(args.length > 1 ? args[1] : ".").toAbsolutePath().normalize();
         exercises        = folder("mmst.exercises", webroot.resolveSibling("exercises"));
+        groupRoot        = folder("mmst.protocols", webroot.resolveSibling("protocols"));
         artifactExamples = folder("mmst.examples", null);
         // Erlang: examples/erlang beside examples/scribble; generated/ at the checkout root.
         erlExamples  = folder("mmst.erlang.examples", artifactExamples == null ? null : artifactExamples.resolveSibling("erlang"));
         erlGenerated = folder("mmst.erlang.generated",
             artifactExamples == null || artifactExamples.getParent() == null ? null : artifactExamples.getParent().resolveSibling("generated"));
+        // This repository's own sets: erlang/<app>/src.
+        erlApps      = folder("mmst.erlang.apps", webroot.resolveSibling("erlang"));
         erlangSetup();
 
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
@@ -104,9 +107,11 @@ public final class Playground {
 
         System.out.println("playground  http://localhost:" + port + "  web " + webroot);
         System.out.println("  exercises " + (isDir(exercises) ? exercises : "none (-Dmmst.exercises)"));
-        System.out.println("  examples  " + (isDir(artifactExamples) ? artifactExamples : "none (-Dmmst.examples)"));
+        System.out.println("  examples  " + (isDir(artifactExamples) ? artifactExamples : "none (-Dmmst.examples)")
+                         + (isDir(groupRoot) ? ", " + groupRoot : ""));
         System.out.println("  erlang    " + (isDir(erlExamples) ? erlExamples : "none")
-                         + (isDir(erlGenerated) ? ", " + erlGenerated : ""));
+                         + (isDir(erlGenerated) ? ", " + erlGenerated : "")
+                         + (isDir(erlApps) ? ", " + erlApps : ""));
         System.out.println("  runs      " + (erlOff != null ? "off: " + erlOffWhy
                                           : erlAll ? "on, for everyone" : "on, localhost only"));
         if (erlOff == null) System.out.println("            OTP " + otp + ", " + erl);
@@ -142,7 +147,13 @@ public final class Playground {
 
     private static final Pattern EXERCISE_DIR = Pattern.compile("exercise(\\d{1,3})");
 
-    // Menu: each exerciseN/ folder, then examples/scribble.
+    // More groups: a folder in protocols/, and the group's name. Quote joins the checker's examples.
+    private static final String[][] GROUPS = {
+        { "quote", "Examples" },
+        { "savina", "Savina" },
+    };
+
+    // Menu: each exerciseN/ folder, the GROUPS folders, then examples/scribble.
     // Only .scr files directly inside.
     private static void examples(HttpExchange ex) throws IOException {
         StringBuilder sb = new StringBuilder("{\"examples\":[");
@@ -160,6 +171,13 @@ public final class Playground {
                     n = entry(sb, n, k + "-" + stem(p), "Exercise " + k, shown(exercises) + d.getFileName() + "/" + p.getFileName(), p);
             }
         }
+        if (isDir(groupRoot))
+            for (String[] g : GROUPS) {
+                Path dir = groupRoot.resolve(g[0]);
+                if (isDir(dir))
+                    for (Path p : protocols(dir))
+                        n = entry(sb, n, stem(p), g[1], shown(groupRoot) + g[0] + "/" + p.getFileName(), p);
+            }
         if (isDir(artifactExamples)) {
             String where = shown(artifactExamples.getParent()) + shown(artifactExamples);
             for (Path p : protocols(artifactExamples))
@@ -534,13 +552,13 @@ public final class Playground {
     private static final int     ERL_MAX_OUTPUT = 300_000;
     private static final int     ERL_SECONDS    = 5;              // the run deadline
     private static final Pattern ERL_NAME       = Pattern.compile("[a-z][A-Za-z0-9_]{0,63}\\.(erl|hrl)");
-    private static final Pattern ERL_PROTOCOL   = Pattern.compile("examples/scribble/([A-Za-z0-9_]+)\\.scr");
+    private static final Pattern ERL_PROTOCOL   = Pattern.compile("(?:examples/scribble|protocols/[a-z0-9_-]+)/([A-Za-z0-9_]+)\\.scr");
 
     // Concurrent runs.
     private static final java.util.concurrent.Semaphore ERL_SLOTS =
         new java.util.concurrent.Semaphore(Integer.getInteger("mmst.erlang.slots", 2));
 
-    private static Path   erlExamples, erlGenerated;
+    private static Path   erlExamples, erlGenerated, erlApps;
     private static String erl;                    // null when runs are off
     private static String otp;
     private static Path   launcher;               // holds mmst_run.beam
@@ -792,6 +810,13 @@ public final class Playground {
     // Rescanned on every request.
     private static List<ErlSet> erlangSets() {
         List<ErlSet> sets = new ArrayList<>();
+        if (isDir(erlApps)) {
+            for (Path app : subfolders(erlApps)) {
+                String name = app.getFileName().toString();
+                erlangSet(sets, "apps/" + name, "examples", name, shown(erlApps) + name + "/src",
+                          protocolOf(app.resolve("README.md")), app.resolve("src"));
+            }
+        }
         if (isDir(erlExamples)) {
             String where = shown(erlExamples.getParent()) + shown(erlExamples);
             for (Path app : subfolders(erlExamples)) {

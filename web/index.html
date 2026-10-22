@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mMST — mixed-choice session types</title>
+<title>mMST · mixed-choice session types</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23002b36'/%3E%3Cpath d='M6 9h20M6 23h20' stroke='%2393a1a1' stroke-opacity='.6' stroke-width='1.5'/%3E%3Cpath d='M9 9l14 14' stroke='%232aa198' stroke-width='3'/%3E%3Cpath d='M9 23l14-14' stroke='%23b58900' stroke-width='3'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="theme.css">
 <script src="vendor/marked.umd.js"></script>
@@ -115,7 +115,6 @@ main[hidden], header select[hidden]{display:none}
 .hintline .rc{font-family:var(--mono); font-size:.88em; font-weight:700}
 .msg a[data-protocol]{color:var(--lhs); text-decoration:underline; text-underline-offset:2px}
 .msg code{font-family:var(--mono); font-size:.88em; background:var(--sunk); padding:.08em .3em; border-radius:0}
-.msg .msg-do{display:flex; flex-wrap:wrap; gap:.4rem .8rem; align-items:center; margin-top:.7rem; font-size:.84rem; color:var(--ink-3)}
 
 ul.erl-roles{list-style:none; margin:0 0 1.1rem; padding:0; max-width:46rem}
 ul.erl-roles li{display:flex; flex-wrap:wrap; align-items:baseline; gap:.15rem .9rem; padding:.45rem 0; border-bottom:1px solid var(--rule)}
@@ -211,9 +210,19 @@ ul.locals .role{
   display:block; margin-bottom:.2rem;
 }
 ul.locals .ty{
-  font-family:var(--mono); font-size:.82rem; line-height:1.6; color:var(--ink);
-  overflow-x:auto; white-space:pre; display:block; padding-bottom:.25rem;
+  font-family:var(--mono); font-size:.82rem; line-height:1.7; color:var(--ink);
+  overflow-x:auto; white-space:normal; display:block; padding-bottom:.25rem;
 }
+/* local types (playground.js localType): roles bold, labels by side, operators coloured */
+.lt-act{white-space:nowrap}
+.lt-role{font-weight:700; color:var(--ink)}
+.lt-op{color:var(--syn-num); font-weight:700}
+.lt-mc sub{font-size:.7em; font-weight:400}
+.lt-lab{color:var(--ink)}
+.lt-lab.lt-l{color:var(--lhs)}
+.lt-lab.lt-r{color:var(--rhs)}
+.lt-pay, .lt-end, .lt-kw, .lt-var{color:var(--ink-2)}
+.lt-dot, .lt-brk{color:var(--ink-3)}
 
 .msg{
   max-width:46rem; background:var(--card); border:1px solid var(--rule);

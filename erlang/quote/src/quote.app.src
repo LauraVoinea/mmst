@@ -1,0 +1,9 @@
+{application, quote,
+ [{description, "Figure 1's Timeout as a price quote"},
+  {vsn, "0.1.0"},
+  {registered, [customer, shop, warehouse]},
+  {mod, {quote_app, []}},
+  {applications, [kernel, stdlib]},
+  {env, []},
+  {modules, []}
+ ]}.

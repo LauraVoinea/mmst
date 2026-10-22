@@ -36,6 +36,75 @@
   function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
   function show(html){ out.innerHTML = html; out.scrollTop = 0; }
 
+  // A local type as the checker prints it, B⊕a1() . [ … ▷1_B … ], in the paper's notation:
+  // B ⊕ a1 . … ▷ …, spaced, without empty () or the outer brackets of a mixed choice. Labels
+  // take the colour of their side of the innermost mixed choice; ▷ is numbered only when the
+  // type has several. Branches l(): T read l . T.
+  var LT = /▷(\d+)_([A-Za-z_][A-Za-z0-9_]*)|([⊕&])|([\[\]{},:.])|\(([^()]*)\)|([A-Za-z0-9_]+)|(\s+)|([^])/g;
+  function localType(text){
+    var toks = [], m;
+    LT.lastIndex = 0;
+    while ((m = LT.exec(text))) {
+      if (m[1] !== undefined) toks.push({ t: "mc", n: m[1] });
+      else if (m[3]) toks.push({ t: "op", s: m[3] });
+      else if (m[4]) toks.push({ t: m[4] });
+      else if (m[5] !== undefined) toks.push({ t: "pay", s: m[5].trim() });
+      else if (m[6]) toks.push({ t: "w", s: m[6] });
+      else if (!m[7]) toks.push({ t: "x", s: m[8] });
+    }
+    // The bracket pair around the whole type, if any, is left out.
+    var outer = -1, depth = 0, i;
+    if (toks.length && toks[0].t === "[") {
+      for (i = 0; i < toks.length; i++) {
+        if (toks[i].t === "[") depth++;
+        else if (toks[i].t === "]" && --depth === 0) break;
+      }
+      if (i === toks.length - 1) outer = i;
+    }
+    var many = toks.filter(function(k){ return k.t === "mc"; }).length > 1;
+    var stack = [], out = "", lab = false;            // lab: the next word is a label
+    function side(){
+      for (var j = stack.length - 1; j >= 0; j--) if (stack[j].mc) return stack[j].side;
+      return "";
+    }
+    function label(s){ return '<span class="lt-lab' + (side() ? " lt-" + side() : "") + '">' + esc(s) + "</span>"; }
+    for (i = 0; i < toks.length; i++) {
+      var k = toks[i], next = toks[i + 1];
+      if (k.t === "w") {
+        if (lab) { out += label(k.s); lab = false;
+          if (next && next.t === "pay") { i++; if (next.s) out += '<span class="lt-pay">(' + esc(next.s) + ")</span>"; }
+          out += "</span>"; }
+        else if (next && next.t === "op") out += '<span class="lt-act"><b class="lt-role">' + esc(k.s) + "</b>";
+        else if (k.s === "end") out += '<span class="lt-end">end</span>';
+        else if (k.s === "rec" && next && next.t === "w") { out += '<span class="lt-kw">μ</span><i class="lt-var">' + esc(next.s) + "</i>"; i++; }
+        else if (stack.length && !stack[stack.length - 1].mc && stack[stack.length - 1].head) {
+          out += '<span class="lt-act">' + label(k.s);            // a branch's label
+          if (next && next.t === "pay") { i++; if (next.s) out += '<span class="lt-pay">(' + esc(next.s) + ")</span>"; }
+          out += "</span>";
+          stack[stack.length - 1].head = false;
+        }
+        else out += '<i class="lt-var">' + esc(k.s) + "</i>";
+      }
+      else if (k.t === "op") {                                 // closes the action's span before a {
+        lab = !(next && next.t === "{");
+        out += ' <span class="lt-op">' + k.s + "</span>" + (lab ? " " : "</span> ");
+      }
+      else if (k.t === "." || k.t === ":") out += '&nbsp;<span class="lt-dot">.</span> ';   // l(): T reads l . T
+      else if (k.t === "mc") {
+        if (stack.length && stack[stack.length - 1].mc) stack[stack.length - 1].side = "r";
+        out += ' <span class="lt-op lt-mc">▷' + (many ? "<sub>" + k.n + "</sub>" : "") + "</span> ";
+      }
+      else if (k.t === "[") { stack.push({ mc: true, side: "l" }); if (i !== 0 || outer < 0) out += '<span class="lt-brk">[</span>'; }
+      else if (k.t === "]") { stack.pop(); if (i !== outer) out += '<span class="lt-brk">]</span>'; }
+      else if (k.t === "{") { stack.push({ mc: false, head: true }); out += '<span class="lt-brk">{</span> '; }
+      else if (k.t === "}") { stack.pop(); out += ' <span class="lt-brk">}</span>'; }
+      else if (k.t === ",") { if (stack.length && !stack[stack.length - 1].mc) stack[stack.length - 1].head = true; out += '<span class="lt-brk">,</span> '; }
+      else if (k.t === "pay") { if (k.s) out += '<span class="lt-pay">(' + esc(k.s) + ")</span>"; }
+      else out += esc(k.s);
+    }
+    return out;
+  }
+
   function msg(kind, title, body){
     return '<div class="result"><div class="msg' + (kind ? " " + kind : "") + '">' +
            '<div class="t">' + esc(title) + '</div>' + esc(body) + '</div></div>';
@@ -105,18 +174,20 @@
 
     if (!r.ok) {
       var k = f.firstFail;
-      h += '<p class="hintline"><b>' + k + ' &mdash; ' + FLAG_NAMES[k][0] + '.</b> ' + FLAG_NAMES[k][1] + '</p>';
+      h += '<p class="hintline"><b>' + k + ', ' + FLAG_NAMES[k][0] + '.</b> ' + FLAG_NAMES[k][1] + '</p>';
       h += '<p class="hintline">Fix the first <b>FAIL</b>: one error can fail two checks.</p>';
       $("resultTitle").textContent = "invalid";
     } else {
       h += '<h3 class="sec">local types</h3><ul class="locals">';
       (r.locals || []).forEach(function(l){
-        h += '<li><span class="role">' + esc(l.role) + '</span><code class="ty">' + esc(l.type) + '</code></li>';
+        h += '<li><span class="role">' + esc(l.role) + '</span><code class="ty" title="' +
+             esc(l.type).replace(/"/g, "&quot;") + '">' + localType(l.type) + '</code></li>';
       });
-      h += '</ul><p class="hintline" style="margin-top:1.2rem"><code>&#8853;</code> select (output-only choice)' +
-           ' &nbsp;&middot;&nbsp; <code>&amp;</code> branch (input-only choice)' +
-           ' &nbsp;&middot;&nbsp; <code>&#9655;n_R</code> separates the left and right of mixed choice <code>n</code>,' +
-           ' observer <code>R</code></p>';
+      h += '</ul><p class="hintline" style="margin-top:1.2rem"><code class="lt-op">&#8853;</code> select (output-only choice)' +
+           ' &nbsp;&middot;&nbsp; <code class="lt-op">&amp;</code> branch (input-only choice)' +
+           ' &nbsp;&middot;&nbsp; <code class="lt-op">&#9655;</code> separates the <span class="lt-lab lt-l">left</span>' +
+           ' and <span class="lt-lab lt-r">right</span> of a mixed choice, numbered when a type has several.' +
+           ' The checker\'s own text is on hover.</p>';
       $("resultTitle").textContent = "valid";
     }
 

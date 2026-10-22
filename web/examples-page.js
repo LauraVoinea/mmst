@@ -26,7 +26,10 @@
     h += '<div class="ex-head"><h2>' + esc(E.title(x.id)) + '</h2>' +
          (a.from ? '<span class="from">' + esc(a.from) + '</span>' : '') +
          '<span class="go"><a class="btn" href="' + href(x.id) + '" title="Check it">open</a>' +
-         '<a class="btn" href="' + href(x.id, "efsm") + '" title="EFSM tab">efsm</a></span></div>';
+         '<a class="btn" href="' + href(x.id, "efsm") + '" title="EFSM tab">efsm</a>' +
+         (a.erlang ? '<a class="btn" href="./#mode=erlang&amp;erl=' +
+                     encodeURIComponent(a.erlang.replace(/<[^>]*>/g, "").trim()) + '" title="Its Erlang">erlang</a>' : '') +
+         '</span></div>';
     if (x.source) h += '<ul class="facts">' + facts(x.source).map(function(f){ return '<li>' + esc(f) + '</li>'; }).join("") + '</ul>';
     if (a.what) h += '<p>' + a.what + '</p>';
     if (a.mc) h += '<p><span class="lbl">mixed choice</span>' + a.mc + '</p>';

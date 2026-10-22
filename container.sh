@@ -35,11 +35,13 @@ exec java -XX:+UseSerialGC -Xmx"${MMST_HEAP:-$heap}" -Dfile.encoding=UTF-8 \
   -Dmmst.deadline="${MMST_DEADLINE:-$deadline}" \
   -Dmmst.checker.heap="${MMST_CHECKER_HEAP:-$checker}" \
   -Dmmst.exercises=/app/exercises \
+  -Dmmst.protocols=/app/protocols \
   -Dmmst.examples=/app/examples/scribble \
   -Dmmst.erlang="${MMST_ERLANG:-all}" \
   -Dmmst.erlang.slots="${MMST_ERLANG_SLOTS:-$eslots}" \
   -Dmmst.erlang.memory="${MMST_ERLANG_MEMORY:-$emem}" \
   -Dmmst.erlang.examples=/app/examples/erlang \
+  -Dmmst.erlang.apps=/app/erlang \
   -Dmmst.erlang.runs=/var/lib/mmst/runs \
   -Dmmst.launcher=/app/mmst_run.erl \
   -cp "/app/classes:/app/checker:/app/jars/*" \

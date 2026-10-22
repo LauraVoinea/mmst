@@ -38,6 +38,8 @@ The classpath is cached in `.classpath`. Erlang runs need `erl` and `erlc` on th
 | `Dockerfile`, `container.sh`, `nonet.c` | the container image |
 | `deploy/` | a server of your own: the setup for Ubuntu 24.04, the service, `mmst-update` |
 | `exercises/` | the exercises in the menu |
+| `protocols/quote`, `erlang/quote` | Quote, Figure 1's Timeout as a price quote, and its Erlang, filled in |
+| `protocols/savina` | four Savina benchmarks as mixed choice, on the examples page |
 
 ## API
 
@@ -57,15 +59,14 @@ heap cap. Responses are cached by protocol text. `-gt-check-fidelity` and
 
 ## Erlang mode
 
-Sets: the artifact's filled-in apps (`examples/erlang`), whatever `./mMST.sh` wrote to
-`generated/`, and modules generated from the editor. Edits are kept per set for the session;
-`.zip` downloads them.
+Sets: this repository's `erlang/quote`, the artifact's filled-in apps (`examples/erlang`),
+whatever `./mMST.sh` wrote to `generated/`, and modules generated from the editor. Edits are
+kept per set for the session; `.zip` downloads them.
 
 **Run** compiles every module in a fresh VM, `gen_` modules first, starts the roles from the
 `*_sup` child specs or else every `gen_` implementer, and reports each role as finished,
 crashed (with the line) or waiting (with its state and postponed events). A `gen_` module whose
-name OTP uses (role `server`, `gen_server`) is renamed for the run. Generated templates stall on
-the pid patterns in `#state_data{}`; the page offers to drop them.
+name OTP uses (role `server`, `gen_server`) is renamed for the run.
 
 ## Erlang runs
 
@@ -150,11 +151,12 @@ resize reboots the Linode, and the playground starts again at the new size.
 No certificate: check that the hostname points at the Linode, and that a Cloud Firewall, if
 the Linode has one, lets in ports 80 and 443; then `systemctl restart caddy`.
 
-
 ## Security
-Requests are capped at 64 KB; checks at 15 s, 256 MB and 400 000 characters of output. Only `.scr` files
-directly in the exercise folders and `examples/scribble` are listed, by
-short path; no request chooses a file. Generated files are deleted after each response.
+
+Requests are capped at 64 KB; checks at 15 s, 256 MB and 400 000 characters of output. Only
+`.scr` files directly in the exercise folders, `protocols/quote`, `protocols/savina` and
+`examples/scribble` are listed, by short path; no request chooses a file. Generated files are
+deleted after each response.
 
 Every response carries a Content-Security-Policy: the pages run only the scripts in `web/`, load
 only from the server, and only the server may frame them, so text from a shared link, the checker

@@ -42,7 +42,7 @@
   // "# Group", then "## id" entries: a paragraph is the description, a list item
   // "key: value" a field. Values are Markdown, kept as HTML.
   var FIELDS = { "title": "title", "from": "from", "what": "what", "mixed choice": "mc",
-                 "look": "look", "try": "try", "result": "result" };
+                 "look": "look", "try": "try", "result": "result", "erlang": "erlang" };
   function read(src){
     var marked = window.marked, group = null, id = null;
     marked.lexer(src).forEach(function(t){

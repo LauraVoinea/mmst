@@ -4,7 +4,7 @@
 #   docker run --rm -p 8080:10000 mmst-playground
 
 # The checker commit the image builds.
-ARG TOOLCHAIN_COMMIT=f5872a33b3f9b6579fac8e867178650f702fbbcc
+ARG TOOLCHAIN_COMMIT=da95a682d934b7cb974e6f4696b210d8efd68152
 
 # --- build ---
 FROM eclipse-temurin:21-jdk AS build
@@ -69,6 +69,9 @@ COPY mmst_run.erl container.sh /app/
 COPY exercises/exercise1/*.scr /app/exercises/exercise1/
 COPY exercises/exercise2/*.scr /app/exercises/exercise2/
 COPY exercises/exercise4/*.scr /app/exercises/exercise4/
+COPY protocols/quote/*.scr /app/protocols/quote/
+COPY protocols/savina/*.scr /app/protocols/savina/
+COPY erlang /app/erlang
 RUN mkdir -p /var/lib/mmst/runs && chmod 711 /var/lib/mmst/runs \
  && chmod 755 /app/container.sh \
  && for c in tini setpriv prlimit erl erlc java mmst-nonet; do \

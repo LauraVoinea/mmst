@@ -460,12 +460,6 @@
         h += '<p class="hintline"><b>Waiting</b>: in that state at the deadline, with nothing it can take. ' +
              '<b>Postponed</b>: arrived, deferred until the state changes.</p>';
     }
-    var pins = pinned();
-    if (pins.n && /had no clause for/.test(r.output || ""))
-      h += '<div class="msg"><div class="t">template stalls</div>Callbacks match the sender against a pid in ' +
-           '<code>#state_data{}</code> that is still <code>undefined</code>. The filled-in apps drop that pattern.' +
-           '<div class="msg-do"><button class="btn" id="erl-unpin">Drop the patterns</button> <span>' + pins.n +
-           (pins.n === 1 ? ' pattern' : ' patterns') + ' in ' + pins.files.join(", ") + '</span></div></div>';
     (r.renamed || []).forEach(function(x){
       h += '<p class="hintline"><code>' + esc(x.from) + '</code> is an OTP module: run as <code>' + esc(x.to) + '</code>.</p>';
     });
@@ -485,31 +479,6 @@
     if (r.stage === "compile" && r.errors.length && file(r.errors[0].file) && !narrow()) jump(r.errors[0].file, r.errors[0].line);
   }
   var traceOn = false;
-
-  /* Template callbacks match #state_data{peer_pid = P} = Data0, which fails while
-     the pid is undefined. Dropping it, as the filled-in apps do, lets them run. */
-  var PIN = /#state_data\{\w+_pid = \w+\} = (Data0?)\b/g;
-  function pinned(){
-    var n = 0, files = [];
-    set.files.forEach(function(f){
-      if (kind(f) !== 0) return;
-      var k = (f.content.match(PIN) || []).length;
-      if (k) { n += k; files.push(f.name); }
-    });
-    return { n: n, files: files };
-  }
-  function unpin(){
-    var pins = pinned();
-    set.files.forEach(function(f){ if (kind(f) === 0) f.content = f.content.replace(PIN, "$1"); });
-    saveEdits();
-    var f = current();
-    ta.value = f ? f.content : "";
-    paint(true);
-    drawChips();
-    title("run");
-    message("", "Patterns dropped",
-      pins.n + (pins.n === 1 ? " pattern" : " patterns") + " in " + pins.files.join(", ") + ". Reset reverts. Run again.");
-  }
 
   function run(){
     if (!set || running) return;
@@ -617,7 +586,6 @@
         else if (sel.value) openListed(sel.value);
       });
       out.addEventListener("click", function(e){
-        if (e.target.closest("#erl-unpin")) return unpin();
         var b = e.target.closest("button.loc");
         if (b) return jump(b.dataset.file, +b.dataset.line);
         var a = e.target.closest("a[data-protocol]");

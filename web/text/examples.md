@@ -1,9 +1,10 @@
 <!-- Descriptions for the examples page and the playground's menu, read by examples.js.
      # a group: its first paragraph introduces it.
      ## an example, by file name. A paragraph is its one-line description; a list sets fields:
-       title (menu name), from (source), what, mixed choice, look, try and result.
-     Order matters: the exercises appear in this order, and the entries under # Examples
-     are the examples page's cards, in this order. -->
+       title (menu name), from (source), what, mixed choice, look, try and result, and
+       erlang (the id of its Erlang set, for a button on its card).
+     Order matters: the exercises and the other groups appear in this order, and the entries
+     under # Examples are the examples page's cards, in this order. -->
 
 # Exercise 1
 
@@ -47,39 +48,65 @@ Valid, but stops after one chunk. Make it recursive so Server streams until Clie
 
 # Exercise 4
 
-Knowledge of choice, for those who finish early: seven changes to `Calculator`, each explained in its comments. Srv observes; Alice has to end up knowing how it went. Predict the flags before you read the comments.
+Knowledge of choice, for those who finish early: three changes to `Calculator`, each one broken. Srv observes; Alice has to end up knowing how it went. Predict what fails, and for whom, before you press Check, then fix it.
 
-## 4-AliceActsUntold
+## 4-a
 
 On the right, Alice sends `note()` to Carol.
 
-## 4-AliceSpeaksFirst
-
-On the right, Alice pokes Srv, the observer, and Srv acks.
-
-## 4-AliceOnlySends
+## 4-b
 
 On the left, Alice only sends `note()` to Carol.
 
-## 4-NoOneTellsAlice
-
-`Calculator` without `cancel()` to Alice.
-
-## 4-AliceNeverHearsBack
-
-`Calculator` without the results to Alice.
-
-## 4-AliceCannotTell
+## 4-c
 
 Both branches send Alice `done()`; only one expects her `ack()`.
 
-## 4-SameLabelBothSides
+# Savina
 
-Alice receives `cancel()` on both sides of the mixed choice.
+Four benchmarks from [Savina](https://doi.org/10.1145/2687357.2687368), Imam and Sarkar, AGERE! 2014, rewritten as mixed choice: in each, a role that would otherwise wait forever has a way to stop waiting. All four have the shape of Exercise 2's `CancellableRPC`, once fixed, with the roles and labels renamed.
+
+## DiningPhilosophers
+
+- title: Dining philosophers
+- from: Savina
+
+Philosopher, the observer, gives up waiting for a fork rather than deadlock; Neighbour learns whether it is eating.
+
+## SleepingBarber
+
+- title: Sleeping barber
+- from: Savina
+
+Customer, the observer, leaves when the waiting room is full rather than queue forever; Shop learns whether it made a sale.
+
+## BankTransfer
+
+- title: Bank transfer
+- from: Savina
+
+Teller, the observer, aborts a transfer held too long by a locked account; Ledger learns whether it was posted or reversed.
+
+## MasterWorker
+
+- title: Master and worker
+- from: Savina
+
+Master, the observer, cancels a worker once another has answered; Pool learns whether the result was stored.
 
 # Examples
 
-From `examples/scribble` in scribble-gt-scala, each with a change to try.
+Quote first: Figure 1's Timeout as a small service, implemented in Erlang. Then the examples from `examples/scribble` in scribble-gt-scala, each with a change to try.
+
+## Quote
+
+- from: Figure 1
+- erlang: apps/quote
+- what: Timeout as a price quote. Customer orders notebooks from Shop and gives Warehouse the postcode; Shop quotes the price, and Warehouse the delivery.
+- mixed choice: Shop is the observer: it waits `PATIENCE_MS` for the order, then gives up with `expired()` and tells Warehouse with `cancel()`.
+- look: Its Erlang: the `gen_` modules the checker generates, and the three roles filled in by hand. Press Run.
+- try: In `customer.erl`, set `THINK_MS` above `PATIENCE_MS`, which is in `shop.erl`, and Run again.
+- result: Shop gives up first: the quote expired, and nothing is set aside.
 
 ## Calculator
 

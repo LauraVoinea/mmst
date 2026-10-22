@@ -1,0 +1,17 @@
+module BankTransfer;
+
+// Savina's bank transaction, as a mixed choice.
+// Teller observes: Account debits the transfer (left), or Teller aborts it when
+// a locked account holds it too long (right). Ledger learns which.
+
+global protocol BankTransfer(role Teller, role Account, role Ledger) {
+    transfer() from Teller to Account;
+    mixed {
+        debited() from Account to Teller;
+        confirmed() from Teller to Account;
+        posted() from Teller to Ledger;
+    } or Account -> Teller {
+        abort() from Teller to Account;
+        reversed() from Teller to Ledger;
+    }
+}
