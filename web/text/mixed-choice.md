@@ -73,8 +73,6 @@ using only local information, so the application code never sees them ([§4.1][s
 
 <div class="checks"></div>
 
-One error can fail two checks: fix the first **FAIL**.
-
 ## projection
 
 The global protocol is projected onto one local type per role ([§4.2][s4.2]). In local types, `⊕`

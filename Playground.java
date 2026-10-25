@@ -115,7 +115,6 @@ public final class Playground {
         System.out.println("  runs      " + (erlOff != null ? "off: " + erlOffWhy
                                           : erlAll ? "on, for everyone" : "on, localhost only"));
         if (erlOff == null) System.out.println("            OTP " + otp + ", " + erl);
-        if (erlOff == null) System.out.println("            " + jailed);
     }
 
     /* --- routes --- */
@@ -147,10 +146,11 @@ public final class Playground {
 
     private static final Pattern EXERCISE_DIR = Pattern.compile("exercise(\\d{1,3})");
 
-    // More groups: a folder in protocols/, and the group's name. Quote joins the checker's examples.
+    // More groups: a folder in protocols/, and the group's name. Lease and Retry join the checker's examples.
     private static final String[][] GROUPS = {
-        { "quote", "Examples" },
-        { "savina", "Savina" },
+        { "more", "More exercises" },
+        { "lease", "Examples" },
+        { "retry", "Examples" },
     };
 
     // Menu: each exerciseN/ folder, the GROUPS folders, then examples/scribble.
@@ -448,12 +448,23 @@ public final class Playground {
             return err("The right side starts with the reverse of the left's first message: for `or A -> B`, "
                      + "`A` to `B` on the left, `B` to `A` on the right.", "mixed-roles", out, where);
 
+        // The checker projects once the four checks pass: they are shown, and the role it cannot project onto.
         Matcher proj = Pattern.compile("Couldn't project to ([A-Za-z0-9_]+)").matcher(out);
-        if (proj.find())
-            return err("Checks pass, but projection onto " + proj.group(1) + " fails"
-                     + (where != null ? "." : ": " + proj.group(1) + " gets the same message in two branches "
-                                             + "of a choice, then acts differently. Use distinct labels."),
-                       "projection", out, where);
+        if (proj.find()) {
+            String role = proj.group(1);
+            String why = "Projection onto " + role + " fails"
+                       + (where != null ? "." : ": " + role + " gets the same message in two branches "
+                                              + "of a choice.");
+            Matcher ok = Pattern.compile("(?m)^([A-Za-z0-9_.]+): OK$").matcher(out);
+            if (!ok.find()) return err(why, "projection", out, where);
+            return "{\"ok\":false,\"stage\":\"project\",\"code\":\"projection\""
+                 + ",\"protocol\":" + jsonStr(ok.group(1))
+                 + ",\"onto\":" + jsonStr(role)
+                 + ",\"flags\":{\"WF\":true,\"SD\":true,\"CT\":true,\"BA\":true}"
+                 + ",\"problems\":" + (where == null ? "[]" : where)
+                 + ",\"error\":" + jsonStr(why)
+                 + ",\"raw\":" + jsonStr(out) + "}";
+        }
 
         if (out.contains("Cannot translate:"))
             return err(where != null ? "To loop, put the `continue` inside the choice, not after it."
@@ -632,11 +643,10 @@ public final class Playground {
     private static final int ERL_MEMORY_MB = Integer.getInteger("mmst.erlang.memory", 768);
     private static String setprivCmd, prlimitCmd, nonetCmd, unshareCmd;   // null: layer unused
     private static boolean jailBounding;
-    private static String jailed = "Runs are not confined.";
 
     private static void jailSetup() {
         String mode = System.getProperty("mmst.erlang.jail", "auto").trim().toLowerCase(Locale.ROOT);
-        if (mode.equals("off")) { jailed = "Runs are not confined (jail=off)."; return; }
+        if (mode.equals("off")) return;
         String setpriv = onPath("setpriv"), unshare = onPath("unshare"), prlimit = onPath("prlimit");
         // A layer stays only if `true` still runs inside the stack.
         if (setpriv != null && "0".equals(output(List.of("id", "-u")))) {
@@ -650,14 +660,6 @@ public final class Playground {
         String nonet = System.getProperty("mmst.erlang.nonet", onPath("mmst-nonet"));
         if (nonet != null && Files.isExecutable(Paths.get(nonet))) { nonetCmd = nonet; if (!jailWorks()) nonetCmd = null; }
         if (prlimit != null) { prlimitCmd = prlimit; if (!jailWorks()) prlimitCmd = null; }
-        List<String> parts = new ArrayList<>();
-        if (setprivCmd != null) parts.add("own user");
-        if (unshareCmd != null || nonetCmd != null) parts.add("no network");
-        if (unshareCmd != null) parts.add("own process tree and temp dirs");
-        if (prlimitCmd != null) parts.add("limits");
-        if (!parts.isEmpty())
-            jailed = "Each run: " + String.join(", ", parts) + "."
-                   + (unshareCmd == null && nonetCmd == null ? " Network open." : "");
         // For everyone, a run needs at least its own user and no network.
         List<String> missing = new ArrayList<>();
         if (setprivCmd == null) missing.add("no own user (needs root and setpriv)");
@@ -768,10 +770,12 @@ public final class Playground {
         return loopback && localName && !proxied ? null : "local";
     }
 
+    // What the page shows. The log has the details.
     private static String erlangWhy(String code) {
         return switch (code) {
             case "local" -> "Runs are for localhost only. MMST_ERLANG=all opens them to everyone: containers only.";
             case "cross-site" -> "Only this playground's page can run Erlang.";
+            case "unconfined", "vm" -> "Runs are off on this server.";
             default -> erlOffWhy;
         };
     }
@@ -874,7 +878,6 @@ public final class Playground {
         StringBuilder sb = new StringBuilder("{\"run\":").append(refused == null)
             .append(",\"code\":").append(jsonStr(refused))
             .append(",\"why\":").append(jsonStr(refused == null ? null : erlangWhy(refused)))
-            .append(",\"jail\":").append(jsonStr(erlOff == null ? jailed : null))
             .append(",\"sets\":[");
         List<ErlSet> sets = erlangSets();
         for (int i = 0; i < sets.size(); i++) {

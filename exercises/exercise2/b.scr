@@ -1,7 +1,7 @@
-module b;
+module Timeout;
 
 // BROKEN: Timeout without TOc() from B to C.
-// Predict what fails, and for whom. Then press Check, compare, and fix it.
+// Which safety properties fail, and why? Then press Check, compare, and fix it.
 
 global protocol Timeout(role A, role B, role C) {
     mixed {

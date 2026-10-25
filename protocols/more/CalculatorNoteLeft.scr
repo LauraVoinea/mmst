@@ -1,0 +1,21 @@
+module CalculatorNoteLeft;
+
+// BROKEN: Calculator with sum only, and with note() from Alice to Carol in place
+// of sum_result() from Carol to Alice.
+// What fails, and why? Then press Check, compare, and fix it.
+
+data <erlang> "integer()" from "rt.jar" as number;
+data <erlang> "integer()" from "rt.jar" as result;
+
+global protocol Calculator(role Alice, role Carol, role Srv){
+    first(number) from Carol to Srv;
+    second(number) from Carol to Srv;
+    mixed{
+        sum() from Carol to Srv;
+        result_sum(result) from Srv to Carol;
+        note() from Alice to Carol;
+    } or Carol -> Srv {
+        timeout() from Srv to Carol;
+        cancel() from Carol to Alice;
+    }
+}

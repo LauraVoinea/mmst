@@ -296,25 +296,23 @@
     title("run");
     var p = protocolLink(), h = '<div class="result"><div class="msg"><div class="t">';
     if (set.group === "examples")
-      h += 'filled in</div>' + (p ? p + ': ' : '') + 'the artifact\'s OTP app, <code>' + esc(set.path) +
-           '</code>. Filled-in callbacks, generated <code>gen_</code> modules.';
+      h += 'filled in</div>' + (p ? p + ': ' : '') + (/^apps\//.test(set.id) ? 'an' : 'the artifact\'s') +
+           ' OTP app, <code>' + esc(set.path) + '</code>. Filled-in callbacks, generated <code>gen_</code> modules.';
     else if (set.group === "generated")
       h += 'generated</div>' + (p ? p + ': ' : '') + '<code>' + esc(set.path) +
-           '</code>. Default callbacks print each receive and choose at random.';
+           '</code>. Default callbacks print each receive and choose at random; an observer overrules at once.';
     else
       h += 'from the editor</div>Generated from ' + (p || "the editor's protocol") +
-           '. Default callbacks print each receive and choose at random.';
+           '. Default callbacks print each receive and choose at random; an observer overrules at once.';
     h += '</div><p class="hintline"><b>Roles:</b> ' + set.roles.map(function(r, i){
       return '<span class="rc rc' + (i % 4) + '">' + esc(r) + '</span>'; }).join(", ") + '.</p>';
     if (list && !list.run) h += offNote();
-    else h += '<p class="hintline"><b>Run</b>: compile, start the roles, run for up to ' + SECONDS + ' s.' +
-              (list && list.jail ? ' ' + esc(list.jail) : '') + '</p>';
+    else h += '<p class="hintline"><b>Run</b>: compile, start the roles, run for up to ' + SECONDS + ' s.</p>';
     show(h + '</div>');
   }
 
   function offNote(){
-    var t = { off: "Runs off", "no-erlang": "No Erlang", launcher: "No launcher", local: "Localhost only",
-              unconfined: "Unconfined", vm: "VM does not start" }[list.code] || "Runs off";
+    var t = { off: "Runs off", "no-erlang": "No Erlang", launcher: "No launcher", local: "Localhost only" }[list.code] || "Runs off";
     var here = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
     var body = {
       off: here ? 'Runs are off: start the server with <code>MMST_ERLANG=1 ./serve.sh</code>. Editing still works.'
@@ -517,9 +515,10 @@
   function editorOptions(){
     var g = $("erl-editor-group");
     if (!g) return;
-    var gen = load(GENERATED), m = host.moduleName() || "Scratch";
+    var gen = load(GENERATED), m = host.moduleName();             // none: the editor has no protocol
     g.innerHTML = (gen ? '<option value="editor">' + esc(gen.label) + '.scr, generated</option>' : '') +
-      '<option value="@editor" id="erl-from-editor">Generate ' + (gen && gen.label === m ? "again " : "") + 'from ' + esc(m) + '.scr</option>';
+      (m ? '<option value="@editor" id="erl-from-editor">Generate ' + (gen && gen.label === m ? "again " : "") + 'from ' + esc(m) + '.scr</option>'
+         : '<option value="@editor" id="erl-from-editor" disabled>Generate from the editor</option>');
     sel.value = set ? set.id : "";
   }
 
@@ -547,9 +546,10 @@
   }
   // Generating checks the protocol, so it waits to be asked.
   function nothingOpen(){
+    var m = host.moduleName();
     sel.value = "";
-    message("wait", "Nothing open", "Open a set from the menu, or choose <b>Generate from " +
-            esc(host.moduleName() || "Scratch") + ".scr</b>.", true);
+    message("wait", "Nothing open", "Open a set from the menu" +
+            (m ? ", or choose <b>Generate from " + esc(m) + ".scr</b>." : "."), true);
   }
 
   MMST.erlang = {
@@ -587,7 +587,7 @@
       });
       out.addEventListener("click", function(e){
         var b = e.target.closest("button.loc");
-        if (b) return jump(b.dataset.file, +b.dataset.line);
+        if (b) { if (host.showEditor) host.showEditor(); return jump(b.dataset.file, +b.dataset.line); }
         var a = e.target.closest("a[data-protocol]");
         if (a) { e.preventDefault(); host.openProtocol(a.dataset.protocol); }
       });

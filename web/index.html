@@ -39,6 +39,15 @@ body.resizing.rows, body.resizing.rows *{cursor:row-resize !important}
 .pane-head .file{color:var(--ink-3)}
 .pane-head .status{font-size:.7rem; color:var(--ink-3)}
 .pane-head .btn.primary{padding:.34rem .8rem}
+/* editor hidden by the header's editor button: the other pane takes the full width, and
+   Check moves to the results' head (playground.js) */
+main.no-editor{grid-template-columns:minmax(0,1fr)}
+main.no-editor > .pane:first-child, main.no-editor > .gutter{display:none}
+@media (max-width:900px){ main.no-editor, #erlang-main.no-editor{grid-template-rows:auto} }
+@media (max-width:600px){
+  .pane-head kbd{display:none}
+  main.no-editor .pane-head{flex-wrap:wrap; height:auto; min-height:42px; row-gap:6px; padding-block:6px}
+}
 
 /* view tabs */
 .tabs{display:inline-flex; border:1px solid var(--rule-2); border-radius:0; overflow:hidden; background:var(--paper)}
@@ -187,7 +196,7 @@ ul.flags li .nm{color:var(--ink-2); font-family:var(--sans); font-size:.92rem}
 ul.flags li .dots{flex:1; border-bottom:1px dotted var(--rule-2); transform:translateY(-.25em)}
 ul.flags li .v{font-weight:600; letter-spacing:.08em}
 ul.flags li .v.p{color:var(--pass)} ul.flags li .v.f{color:var(--fail)}
-ul.flags li.first-fail b{color:var(--fail)}
+ul.flags li.fail b{color:var(--fail)}
 
 /* where it fails: a line per construct; line numbers jump to the editor */
 .where{font-family:var(--mono); font-size:.8rem; line-height:1.5; color:var(--ink-2)}
@@ -213,16 +222,6 @@ ul.locals .ty{
   font-family:var(--mono); font-size:.82rem; line-height:1.7; color:var(--ink);
   overflow-x:auto; white-space:normal; display:block; padding-bottom:.25rem;
 }
-/* local types (playground.js localType): roles bold, labels by side, operators coloured */
-.lt-act{white-space:nowrap}
-.lt-role{font-weight:700; color:var(--ink)}
-.lt-op{color:var(--syn-num); font-weight:700}
-.lt-mc sub{font-size:.7em; font-weight:400}
-.lt-lab{color:var(--ink)}
-.lt-lab.lt-l{color:var(--lhs)}
-.lt-lab.lt-r{color:var(--rhs)}
-.lt-pay, .lt-end, .lt-kw, .lt-var{color:var(--ink-2)}
-.lt-dot, .lt-brk{color:var(--ink-3)}
 
 .msg{
   max-width:46rem; background:var(--card); border:1px solid var(--rule);
@@ -283,25 +282,33 @@ pre.raw{
 .efsm-svg .ah.rhs{fill:var(--rhs)}
 .efsm-svg .ah.none, .efsm-svg .ah.jump{fill:var(--ink-3)}
 .efsm-svg .hit{fill:none; stroke:transparent; stroke-width:16}
-.efsm-svg .hit.next{cursor:pointer}
+.efsm-svg .hit, .efsm-svg .lbl{cursor:pointer}
 .efsm-svg .lbl rect{fill:var(--paper); stroke:var(--rule); stroke-width:1}
-.efsm-svg .lbl text{font-family:var(--mono); font-size:10.5px; text-anchor:middle; fill:var(--ink-2)}
-.efsm-svg .lbl .ev{font-weight:700; fill:var(--ink)}
-.efsm-svg .lbl.lhs .ev{fill:var(--lhs)}
-.efsm-svg .lbl.rhs .ev{fill:var(--rhs)}
-.efsm-svg .lbl.next{cursor:pointer}
+.efsm-svg .lbl text{font-family:var(--mono); font-size:10.5px; text-anchor:middle; fill:var(--ink-2); white-space:pre}
+/* label parts in the local types' colours (.lt-* in theme.css; efsm.js) */
+.efsm-svg .lbl .t-role{fill:var(--ink); font-weight:700}
+.efsm-svg .lbl .t-op{fill:var(--syn-num); font-weight:700}
+.efsm-svg .lbl .t-lab{fill:var(--ink)}
+.efsm-svg .lbl .t-lab.lhs{fill:var(--lhs)}
+.efsm-svg .lbl .t-lab.rhs{fill:var(--rhs)}
+.efsm-svg .lbl .t-pay, .efsm-svg .lbl .t-kw, .efsm-svg .lbl .t-var{fill:var(--ink-2)}
+.efsm-svg .lbl .t-var{font-style:italic}
+.efsm-svg .lbl .t-dot{fill:var(--ink-3)}
 .efsm-svg .lbl.next rect{stroke:var(--hl-edge); stroke-width:2}
+.efsm-svg .lbl.sel rect{stroke:var(--accent); stroke-width:2.4}
+.efsm-svg .tr.sel{stroke-width:3.2}
 .efsm-svg .lbl.hot rect{fill:var(--hl); stroke:var(--hl-edge)}
-.efsm-svg .lbl.hot text{fill:var(--hl-on)}
+.efsm-svg .lbl.hot text, .efsm-svg .lbl.hot tspan[class]{fill:var(--hl-on)}
 .efsm-svg .note{font-family:var(--mono); font-size:10px; fill:var(--ink-3)}
 .efsm-svg .st .ring{fill:var(--paper); stroke:var(--ink-3); stroke-width:1.6}
 .efsm-svg .st.start .ring{stroke:var(--ink)}
-.efsm-svg .st.entry .ring{stroke:var(--accent); stroke-width:2.8}
+.efsm-svg .st.entry .ring{stroke:var(--syn-num); stroke-width:2.8}
 .efsm-svg .st .inner{fill:none; stroke:var(--ink-3); stroke-width:1.3}
 .efsm-svg .st.cont .ring{stroke-dasharray:4 3}
 .efsm-svg .st .halo{fill:none; stroke:var(--hl); stroke-width:3; opacity:0}
 .efsm-svg .sid{font-family:var(--mono); font-size:11.5px; font-weight:700; text-anchor:middle; fill:var(--ink)}
-.efsm-svg .badge{font-family:var(--mono); font-size:10px; text-anchor:middle; fill:var(--accent)}
+.efsm-svg .badge{font-family:var(--mono); font-size:10px; text-anchor:middle; fill:var(--ink-2)}
+.efsm-svg .badge.mc{fill:var(--syn-num); font-weight:700}
 .efsm-svg .st.cur .ring{fill:var(--hl); stroke:var(--hl-edge); stroke-width:2.4}
 .efsm-svg .st.cur .sid{fill:var(--hl-on)}
 .efsm-svg .st.cur .halo{animation:efsmPulse 1.4s ease-out infinite; transform-box:fill-box; transform-origin:center}
@@ -310,7 +317,25 @@ pre.raw{
 @keyframes efsmPulse{ 0%{opacity:.85; transform:scale(.85)} 100%{opacity:0; transform:scale(1.35)} }
 @media (prefers-reduced-motion:reduce){ .efsm-svg .st.cur .halo{animation:none; opacity:.8} }
 .efsm-trace{display:flex; gap:.6rem; align-items:baseline; margin:.8rem 0 0; flex-wrap:wrap}
-.efsm-trace .lead{font-family:var(--mono); font-size:.66rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent)}
+.efsm-trace .lead, .efsm-type .lead, .efsm-code-head .lead{font-family:var(--mono); font-size:.66rem; letter-spacing:.14em; text-transform:uppercase; color:var(--accent)}
+/* the role's local type above the diagram; the selected transition's actions lit (efsm.js) */
+.efsm-type{margin:0 0 .7rem; font-size:.84rem; line-height:1.9}
+.efsm-type .lead{margin-right:.7rem}
+.efsm-type code.ty{font-family:var(--mono)}
+.efsm-type .lt-act.on, .efsm-type .lt-mc.on{background:var(--sel); box-shadow:0 0 0 2px var(--accent)}
+/* the selected transition's code: its clause, the callback, the send */
+.efsm-code{margin:.9rem 0 0}
+.efsm-code-head{display:flex; flex-wrap:wrap; gap:.3rem .9rem; align-items:baseline; font-size:.82rem}
+.efsm-code-lbl{font-family:var(--mono)}
+.efsm-code-st, .efsm-code-body{font-size:.74rem; color:var(--ink-3)}
+.efsm-code .snip{margin:.6rem 0 0}
+.efsm-code .snip-head{display:flex; flex-wrap:wrap; gap:.2rem .6rem; align-items:baseline; font-size:.74rem; color:var(--ink-2)}
+.efsm-code .snip-head code{font-family:var(--mono); color:var(--ink)}
+.efsm-code .snip-head a{color:var(--accent); text-decoration:underline; text-underline-offset:2px}
+.efsm-code pre.code{margin:.25rem 0 0; max-height:16rem; overflow:auto; font-size:.76rem; padding:.6rem .8rem}
+/* the Erlang tab: a clause marked from the EFSM view (playground.js) */
+#fileBody{position:relative}
+.code-band{position:absolute; left:0; right:0; background:var(--sel); pointer-events:none}
 .efsm-trace ol{list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:.3rem}
 .efsm-trace li{
   font-family:var(--mono); font-size:.74rem; padding:.16rem .45rem; border-radius:0;
@@ -322,7 +347,10 @@ pre.raw{
 .efsm-trace li.end, .efsm-trace li.empty{background:transparent; border-left:0; color:var(--ink-3)}
 .efsm-trace li.empty{font-family:var(--sans)}
 .efsm-legend{display:flex; flex-wrap:wrap; gap:.35rem 1.2rem; margin:1rem 0 0; font-size:.78rem; color:var(--ink-2)}
-.efsm-legend code{font-family:var(--mono); font-size:.92em; color:var(--ink)}
+.efsm-legend code{font-family:var(--mono); font-size:.92em; color:var(--ink); background:var(--sunk); padding:.1em .35em}
+.efsm-legend .lt-op{color:var(--syn-num)}
+.efsm-legend .lt-kw{color:var(--ink-2)}
+.efsm-legend .lt-dot{color:var(--ink-3)}
 .efsm-legend .row{flex-basis:100%}
 .efsm-legend .sw{display:inline-block; width:22px; vertical-align:middle; margin-right:.4rem; border-top:2.5px solid var(--ink-3)}
 .efsm-legend .sw.lhs{border-top-color:var(--lhs)}

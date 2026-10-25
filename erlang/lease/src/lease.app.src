@@ -1,0 +1,9 @@
+{application, lease,
+ [{description, "Figure 1's Timeout as a lease"},
+  {vsn, "0.1.0"},
+  {registered, [client, lockservice, storage]},
+  {mod, {lease_app, []}},
+  {applications, [kernel, stdlib]},
+  {env, []},
+  {modules, []}
+ ]}.

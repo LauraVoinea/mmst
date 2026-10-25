@@ -9,7 +9,8 @@
 
     // Filled from text/examples.md:
     featured: [],   // the entries under "# Examples", in order: the examples page's cards
-    groups: {},     // group name -> its introduction (HTML)
+    groups: {},     // group name -> its introduction (HTML blocks)
+    menu: {},       // group name -> its name in the playground's menu, if not the group's own
     about: {},      // example id -> { group, text, title, from, what, mc, look, tryIt: [try, result] }
 
     title: function(id){ var a = E.about[id]; return (a && a.title) || id; },
@@ -40,12 +41,14 @@
   };
 
   // "# Group", then "## id" entries: a paragraph is the description, a list item
-  // "key: value" a field. Values are Markdown, kept as HTML.
+  // "key: value" a field. Values are Markdown, kept as HTML. Under a group itself, a list
+  // of one item "title: …" is its name in the playground's menu, as plain text; the rest,
+  // up to its first entry, is its introduction, whole: paragraphs, lists, tables.
   var FIELDS = { "title": "title", "from": "from", "what": "what", "mixed choice": "mc",
                  "look": "look", "try": "try", "result": "result", "erlang": "erlang" };
   function read(src){
-    var marked = window.marked, group = null, id = null;
-    marked.lexer(src).forEach(function(t){
+    var marked = window.marked, group = null, id = null, toks = marked.lexer(src), intro = {};
+    toks.forEach(function(t){
       if (t.type === "heading" && t.depth === 1) { group = t.text.trim(); id = null; return; }
       if (t.type === "heading" && t.depth === 2) {
         id = t.text.trim();
@@ -53,16 +56,27 @@
         if (group === "Examples") E.featured.push(id);
         return;
       }
-      if (t.type === "paragraph") {
-        var html = marked.parseInline(t.text);
-        if (id) E.about[id].text = E.about[id].text ? E.about[id].text + " " + html : html;
-        else if (group && !E.groups[group]) E.groups[group] = html;
+      if (!id) {                                                // the group's own text
+        if (!group || t.type === "space" || t.type === "html") return;
+        var title = t.type === "list" && !t.ordered && t.items.length === 1 && /^title:\s*(.+)$/i.exec(t.items[0].text.trim());
+        if (title) E.menu[group] = title[1].trim();
+        else (intro[group] = intro[group] || []).push(t);
         return;
       }
-      if (t.type === "list" && id) t.items.forEach(function(it){
+      if (t.type === "paragraph") {
+        var html = marked.parseInline(t.text);
+        E.about[id].text = E.about[id].text ? E.about[id].text + " " + html : html;
+        return;
+      }
+      if (t.type === "list") t.items.forEach(function(it){
         var m = /^([a-z ]+):\s*([\s\S]*)$/i.exec(it.text.trim()), k = m && FIELDS[m[1].toLowerCase()];
         if (k) E.about[id][k] = marked.parseInline(m[2]);
       });
+    });
+    Object.keys(intro).forEach(function(g){
+      var ts = intro[g];
+      ts.links = toks.links;
+      E.groups[g] = marked.parser(ts);
     });
     Object.keys(E.about).forEach(function(id){
       var a = E.about[id];

@@ -47,7 +47,7 @@ case "$reply" in
      exit 1 ;;
 esac
 
-# Its first lines: the sizing, and whether Erlang runs are on and confined.
+# Its first lines: the sizing, and whether Erlang runs are on.
 log=""
 for _ in $(seq 15); do
   log=$(docker logs mmst 2>&1 || true)

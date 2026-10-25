@@ -2,25 +2,6 @@
 (function(){
   "use strict";
 
-  var SEED = [
-    "module Scratch;",
-    "",
-    "// B observes: it goes along with A (left) or times out (right).",
-    "",
-    "global protocol Scratch(role A, role B, role C) {",
-    "    mixed {",
-    "        a1() from A to B;",
-    "        a2() from A to C;",
-    "        a3() from B to C;",
-    "        a4() from B to A;",
-    "        a5() from C to A;",
-    "    } or A -> B {",
-    "        TOa() from B to A;",
-    "        TOc() from B to C;",
-    "    }",
-    "}"
-  ].join("\n");
-
   var FLAG_NAMES = window.MMST.checks;
 
   function $(id){ return document.getElementById(id); }
@@ -34,76 +15,8 @@
   }
 
   function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
-  function show(html){ out.innerHTML = html; out.scrollTop = 0; }
-
-  // A local type as the checker prints it, B⊕a1() . [ … ▷1_B … ], in the paper's notation:
-  // B ⊕ a1 . … ▷ …, spaced, without empty () or the outer brackets of a mixed choice. Labels
-  // take the colour of their side of the innermost mixed choice; ▷ is numbered only when the
-  // type has several. Branches l(): T read l . T.
-  var LT = /▷(\d+)_([A-Za-z_][A-Za-z0-9_]*)|([⊕&])|([\[\]{},:.])|\(([^()]*)\)|([A-Za-z0-9_]+)|(\s+)|([^])/g;
-  function localType(text){
-    var toks = [], m;
-    LT.lastIndex = 0;
-    while ((m = LT.exec(text))) {
-      if (m[1] !== undefined) toks.push({ t: "mc", n: m[1] });
-      else if (m[3]) toks.push({ t: "op", s: m[3] });
-      else if (m[4]) toks.push({ t: m[4] });
-      else if (m[5] !== undefined) toks.push({ t: "pay", s: m[5].trim() });
-      else if (m[6]) toks.push({ t: "w", s: m[6] });
-      else if (!m[7]) toks.push({ t: "x", s: m[8] });
-    }
-    // The bracket pair around the whole type, if any, is left out.
-    var outer = -1, depth = 0, i;
-    if (toks.length && toks[0].t === "[") {
-      for (i = 0; i < toks.length; i++) {
-        if (toks[i].t === "[") depth++;
-        else if (toks[i].t === "]" && --depth === 0) break;
-      }
-      if (i === toks.length - 1) outer = i;
-    }
-    var many = toks.filter(function(k){ return k.t === "mc"; }).length > 1;
-    var stack = [], out = "", lab = false;            // lab: the next word is a label
-    function side(){
-      for (var j = stack.length - 1; j >= 0; j--) if (stack[j].mc) return stack[j].side;
-      return "";
-    }
-    function label(s){ return '<span class="lt-lab' + (side() ? " lt-" + side() : "") + '">' + esc(s) + "</span>"; }
-    for (i = 0; i < toks.length; i++) {
-      var k = toks[i], next = toks[i + 1];
-      if (k.t === "w") {
-        if (lab) { out += label(k.s); lab = false;
-          if (next && next.t === "pay") { i++; if (next.s) out += '<span class="lt-pay">(' + esc(next.s) + ")</span>"; }
-          out += "</span>"; }
-        else if (next && next.t === "op") out += '<span class="lt-act"><b class="lt-role">' + esc(k.s) + "</b>";
-        else if (k.s === "end") out += '<span class="lt-end">end</span>';
-        else if (k.s === "rec" && next && next.t === "w") { out += '<span class="lt-kw">μ</span><i class="lt-var">' + esc(next.s) + "</i>"; i++; }
-        else if (stack.length && !stack[stack.length - 1].mc && stack[stack.length - 1].head) {
-          out += '<span class="lt-act">' + label(k.s);            // a branch's label
-          if (next && next.t === "pay") { i++; if (next.s) out += '<span class="lt-pay">(' + esc(next.s) + ")</span>"; }
-          out += "</span>";
-          stack[stack.length - 1].head = false;
-        }
-        else out += '<i class="lt-var">' + esc(k.s) + "</i>";
-      }
-      else if (k.t === "op") {                                 // closes the action's span before a {
-        lab = !(next && next.t === "{");
-        out += ' <span class="lt-op">' + k.s + "</span>" + (lab ? " " : "</span> ");
-      }
-      else if (k.t === "." || k.t === ":") out += '&nbsp;<span class="lt-dot">.</span> ';   // l(): T reads l . T
-      else if (k.t === "mc") {
-        if (stack.length && stack[stack.length - 1].mc) stack[stack.length - 1].side = "r";
-        out += ' <span class="lt-op lt-mc">▷' + (many ? "<sub>" + k.n + "</sub>" : "") + "</span> ";
-      }
-      else if (k.t === "[") { stack.push({ mc: true, side: "l" }); if (i !== 0 || outer < 0) out += '<span class="lt-brk">[</span>'; }
-      else if (k.t === "]") { stack.pop(); if (i !== outer) out += '<span class="lt-brk">]</span>'; }
-      else if (k.t === "{") { stack.push({ mc: false, head: true }); out += '<span class="lt-brk">{</span> '; }
-      else if (k.t === "}") { stack.pop(); out += ' <span class="lt-brk">}</span>'; }
-      else if (k.t === ",") { if (stack.length && !stack[stack.length - 1].mc) stack[stack.length - 1].head = true; out += '<span class="lt-brk">,</span> '; }
-      else if (k.t === "pay") { if (k.s) out += '<span class="lt-pay">(' + esc(k.s) + ")</span>"; }
-      else out += esc(k.s);
-    }
-    return out;
-  }
+  var empty = false;                                  // the pane says the editor is empty
+  function show(html){ out.innerHTML = html; out.scrollTop = 0; empty = false; }
 
   function msg(kind, title, body){
     return '<div class="result"><div class="msg' + (kind ? " " + kind : "") + '">' +
@@ -128,18 +41,23 @@
     }).join("") + '</div>';
   }
 
-  function renderFlags(flags, problems){
-    var order = ["WF","SD","CT","BA"], firstFail = null, html = '<ul class="flags">';
+  // The four checks; with onto, the role the checker cannot project onto once they pass.
+  function renderFlags(flags, problems, onto){
+    var order = ["WF","SD","CT","BA"], html = '<ul class="flags">';
     order.forEach(function(k){
       var pass = flags[k], mine = (problems || []).filter(function(p){ return p.kind === k; });
-      if (!pass && firstFail === null) firstFail = k;
-      html += '<li' + (!pass && firstFail === k ? ' class="first-fail"' : '') + '>' +
+      html += '<li' + (pass ? '' : ' class="fail"') + '>' +
               '<b>' + k + '</b><span class="nm">' + FLAG_NAMES[k][0] + '</span>' +
               '<span class="dots"></span>' +
               '<span class="v ' + (pass ? "p" : "f") + '">' + (pass ? "PASS" : "FAIL") + '</span>' +
               (mine.length ? where(mine) : '') + '</li>';
     });
-    return { html: html + "</ul>", firstFail: firstFail };
+    if (onto) {
+      var mine = (problems || []).filter(function(p){ return p.kind === "projection"; });
+      html += '<li class="fail"><b></b><span class="nm">projection onto ' + esc(onto) + '</span>' +
+              '<span class="dots"></span><span class="v f">FAIL</span>' + (mine.length ? where(mine) : '') + '</li>';
+    }
+    return html + "</ul>";
   }
 
   var TITLES = {
@@ -166,28 +84,25 @@
                   (ps.length ? where(ps) : '') + (said ? '' : rich(r.error || "No result.")) + '</div>' + raw(r) + '</div>');
     }
 
-    var f = renderFlags(r.flags, ps), h = '<div class="result">';
+    var onto = r.code === "projection" ? r.onto || "?" : null;
+    var h = '<div class="result">';
     h += '<div class="verdict"><span class="tag ' + (r.ok ? "ok" : "no") + '">' +
          (r.ok ? "valid" : "invalid") + '</span>' +
          (r.protocol ? '<span class="name">' + esc(r.protocol) + '</span>' : '') + '</div>';
-    h += f.html;
+    h += renderFlags(r.flags, ps, onto);
 
     if (!r.ok) {
-      var k = f.firstFail;
-      h += '<p class="hintline"><b>' + k + ', ' + FLAG_NAMES[k][0] + '.</b> ' + FLAG_NAMES[k][1] + '</p>';
-      h += '<p class="hintline">Fix the first <b>FAIL</b>: one error can fail two checks.</p>';
+      if (onto && !ps.length && r.error) h += '<p class="hintline">' + rich(r.error) + '</p>';   // no lines to show
       $("resultTitle").textContent = "invalid";
     } else {
       h += '<h3 class="sec">local types</h3><ul class="locals">';
       (r.locals || []).forEach(function(l){
-        h += '<li><span class="role">' + esc(l.role) + '</span><code class="ty" title="' +
-             esc(l.type).replace(/"/g, "&quot;") + '">' + localType(l.type) + '</code></li>';
+        h += '<li><span class="role">' + esc(l.role) + '</span><code class="ty">' + window.MMST.localType(l.type) + '</code></li>';
       });
       h += '</ul><p class="hintline" style="margin-top:1.2rem"><code class="lt-op">&#8853;</code> select (output-only choice)' +
            ' &nbsp;&middot;&nbsp; <code class="lt-op">&amp;</code> branch (input-only choice)' +
            ' &nbsp;&middot;&nbsp; <code class="lt-op">&#9655;</code> separates the <span class="lt-lab lt-l">left</span>' +
-           ' and <span class="lt-lab lt-r">right</span> of a mixed choice, numbered when a type has several.' +
-           ' The checker\'s own text is on hover.</p>';
+           ' and <span class="lt-lab lt-r">right</span> of a mixed choice, numbered when a type has several.</p>';
       $("resultTitle").textContent = "valid";
     }
 
@@ -195,20 +110,26 @@
   }
 
   var generated = null;
-  function renderFiles(files){
+  // want, from the EFSM view's code: { file, line, to }, that file open with those lines marked.
+  function renderFiles(files, want){
     if (!files || !files.length) return show(msg("", "Nothing generated", "No files."));
     generated = files;
+    var at = 0;
+    if (want && want.file) files.forEach(function(f, i){ if (f.name === want.file) at = i; });
     var h = '<div class="files-bar"><span>' + esc(moduleName() || "Generated") +
             ': a <code>gen_</code> module per role, and callbacks to fill in.</span>' +
             '<button class="btn" id="toErlang" title="Edit and run in Erlang mode">Edit and run &rarr;</button></div>';
     h += '<div class="files">';
     files.forEach(function(f, i){
-      h += '<button data-i="' + i + '"' + (i === 0 ? ' class="on"' : '') + '>' + esc(f.name) + '</button>';
+      h += '<button data-i="' + i + '"' + (i === at ? ' class="on"' : '') + '>' + esc(f.name) + '</button>';
     });
-    h += '</div><pre class="code" id="fileBody">' + window.MMST.highlight(files[0].content, "erlang") + '</pre>';
+    // The parser drops a newline right after <pre>: this one, not the file's, so lines stay numbered.
+    h += '</div><pre class="code" id="fileBody">\n' + window.MMST.highlight(files[at].content, "erlang") + '</pre>';
     show(h);
+    if (want && want.line) markLines($("fileBody"), want.line, want.to || want.line);
     $("resultTitle").textContent = "generated erlang";
     $("toErlang").addEventListener("click", function(){
+      editor(true);
       window.MMST.erlang.openGenerated(moduleName() || "Scratch", generated);
       setMode("erlang");
     });
@@ -221,9 +142,36 @@
     });
   }
 
-  function renderEFSMPane(machines){
+  // A band behind lines from..to of a file, scrolled to the middle.
+  function markLines(pre, from, to){
+    var cs = getComputedStyle(pre), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.6;
+    var band = document.createElement("span");
+    band.className = "code-band";
+    band.style.top = ((parseFloat(cs.paddingTop) || 0) + (from - 1) * lh) + "px";
+    band.style.height = ((to - from + 1) * lh) + "px";
+    pre.appendChild(band);
+    band.scrollIntoView({ block: "center" });
+  }
+
+  // The EFSMs of text; role: the one to show first. The local types and the generated code
+  // come when asked for: the type above the diagram, the code of a transition below it.
+  function renderEFSMPane(machines, text, role){
     if (!machines || !machines.length) return show(msg("", "Nothing to show", "No EFSMs."));
-    window.MMST.efsm.render(out, machines);
+    var types = null, code = null;
+    window.MMST.efsm.render(out, machines, {
+      role: role,
+      types: function(){
+        return types || (types = post("/api/validate", { source: text }).then(function(r){
+          var t = {};
+          (r.locals || []).forEach(function(l){ if (!(l.role in t)) t[l.role] = l.type; });
+          return t;
+        }));
+      },
+      code: function(){
+        return code || (code = post("/api/generate", { source: text }).then(function(r){ return r.ok && r.files ? r.files : []; }));
+      },
+      openCode: function(file, line, to){ generate({ file: file, line: line, to: to }); }
+    });
     out.scrollTop = 0;
     $("resultTitle").textContent = "efsm";
   }
@@ -242,7 +190,7 @@
   function offline(e){
     $("resultTitle").textContent = "offline";
     show(msg("", "Offline",
-      "The server is unreachable. Your protocol is still in the editor; ./mMST.sh checks it locally. (" + e.message + ")"));
+      "The server is unreachable. Your protocol is still in the editor. (" + e.message + ")"));
   }
 
   function busy(on, label){
@@ -251,15 +199,20 @@
     status.textContent = on ? (label || "checking…") : "";
   }
 
-  // Loaded, not checked: nothing runs until asked.
+  // Loaded, not checked: nothing runs until asked. An empty editor says so until written in.
   function idle(){
-    $("resultTitle").textContent = "not checked";
-    show(msg("wait", "Not checked", "Press Check, or " + (MAC ? "\u2318\u21A9" : "Ctrl+\u21A9") + "."));
+    var none = !src.value.trim();
+    $("resultTitle").textContent = none ? "empty" : "not checked";
+    show(none ? msg("wait", "Empty", "Write a protocol, or load one from the menu.")
+              : msg("wait", "Not checked", "Press Check, or " + (MAC ? "\u2318\u21A9" : "Ctrl+\u21A9") + "."));
+    empty = none;
   }
+  function blank(){ if (src.value.trim()) return false; mark(null); idle(); return true; }
 
   function check(){
     shown = true;
     select("checks");
+    if (blank()) return;
     mark(null);
     busy(true);
     $("resultTitle").textContent = "checking";
@@ -268,27 +221,30 @@
       .then(function(){ busy(false); }, function(){ busy(false); });
   }
 
-  function generate(){
+  function generate(want){
     shown = true;
     select("erlang");
+    if (blank()) return;
     mark(null);
     busy(true, "generating…");
     $("resultTitle").textContent = "generating";
     show(msg("wait", "Generating", ""));
     post("/api/generate", { source: src.value })
-      .then(function(r){ if (r.ok && r.files) renderFiles(r.files); else render(r); })
+      .then(function(r){ if (r.ok && r.files) renderFiles(r.files, want); else render(r); })
       .catch(offline).then(function(){ busy(false); }, function(){ busy(false); });
   }
 
-  function showEFSMs(){
+  function showEFSMs(role){
+    var text = src.value;
     shown = true;
     select("efsm");
+    if (blank()) return;
     mark(null);
     busy(true, "computing…");
     $("resultTitle").textContent = "computing";
     show(msg("wait", "Computing", ""));
-    post("/api/efsm", { source: src.value })
-      .then(function(r){ if (r.ok && r.machines) renderEFSMPane(r.machines); else render(r); })
+    post("/api/efsm", { source: text })
+      .then(function(r){ if (r.ok && r.machines) renderEFSMPane(r.machines, text, role); else render(r); })
       .catch(offline).then(function(){ busy(false); }, function(){ busy(false); });
   }
 
@@ -297,9 +253,9 @@
     return m ? m[1] : null;
   }
   function syncName(){
-    var m = moduleName();
-    $("modname").textContent = m ? m + ".scr" : "no module declaration";
-    $("modname").style.color = m ? "" : "var(--fail)";
+    var m = moduleName(), none = !src.value.trim();
+    $("modname").textContent = m ? m + ".scr" : none ? "" : "no module declaration";
+    $("modname").style.color = m || none ? "" : "var(--fail)";
   }
 
   // Marks from the last check: hard, the lines at fault; soft, the construct. Kept
@@ -346,8 +302,33 @@
   }
   out.addEventListener("click", function(e){
     var b = e.target.closest("button.loc[data-line]");
-    if (b) jump(+b.dataset.line);
+    if (b) { editor(true); jump(+b.dataset.line); }
   });
+
+  // The header's editor button hides and shows the editor, in both modes. Hidden, the other
+  // pane takes the full width, and Check and its status move to the results' head.
+  var editorHidden = false, mains = [$("protocol-main"), $("erlang-main")];
+  var leftHead = $("check").parentNode, rightHead = out.parentNode.querySelector(".pane-head .right");
+  function editor(show){
+    if (editorHidden !== show) return;
+    editorHidden = !show;
+    mains.forEach(function(m){ m.classList.toggle("no-editor", editorHidden); });
+    var to = show ? leftHead : rightHead, before = show ? null : rightHead.querySelector(".tabs");
+    to.insertBefore(status, before);
+    to.insertBefore($("check"), before);
+    syncEditorButton();
+  }
+  function syncEditorButton(){
+    var b = document.querySelector("#site-header button[data-editor]");
+    if (!b) return;
+    b.setAttribute("aria-controls", "protocol-left erlang-left");
+    b.setAttribute("aria-pressed", editorHidden ? "false" : "true");
+    b.title = editorHidden ? "Show the editor" : "Hide the editor";
+  }
+  $("site-header").addEventListener("click", function(e){
+    if (e.target.closest("button[data-editor]")) editor(editorHidden);
+  });
+  window.MMST.ready.then(syncEditorButton);
 
   function decode(s){
     try { return decodeURIComponent(escape(atob(s.replace(/-/g,"+").replace(/_/g,"/")))); }
@@ -358,6 +339,7 @@
   var VIEWS = { checks: check, efsm: showEFSMs, erlang: generate };
   tabs.forEach(function(b){ b.addEventListener("click", function(){ VIEWS[b.getAttribute("data-view")](); }); });
   src.addEventListener("input", syncName);
+  src.addEventListener("input", function(){ if (empty && src.value.trim()) idle(); });
   src.addEventListener("input", keepMarks);
   src.addEventListener("input", syncHighlight);
   src.addEventListener("scroll", function(){
@@ -365,10 +347,25 @@
     pre.scrollTop = src.scrollTop; pre.scrollLeft = src.scrollLeft;
   });
 
-  // The draft survives a visit to the other pages.
+  // The draft comes back after a visit to the other pages. Opened afresh or reloaded, the
+  // editor is empty, even when the address names an example.
   var DRAFT = "mmst.draft";
   function saveDraft(){ try { sessionStorage.setItem(DRAFT, src.value); } catch (e) {} }
-  function loadDraft(){ try { return sessionStorage.getItem(DRAFT); } catch (e) { return null; } }
+  function navType(){
+    try { var n = performance.getEntriesByType("navigation")[0]; return n ? n.type : "navigate"; }
+    catch (e) { return "navigate"; }
+  }
+  function returning(){
+    var type = navType();
+    if (type === "back_forward") return true;
+    if (type !== "navigate" || !document.referrer) return false;
+    try { var r = new URL(document.referrer); return r.origin === location.origin && r.pathname !== location.pathname; }
+    catch (e) { return false; }
+  }
+  function loadDraft(){
+    if (!returning()) return null;
+    try { return sessionStorage.getItem(DRAFT); } catch (e) { return null; }
+  }
   src.addEventListener("input", saveDraft);
   window.addEventListener("pagehide", saveDraft);
 
@@ -407,17 +404,17 @@
   }
   modeButtons.forEach(function(b){ b.addEventListener("click", function(){ setMode(b.getAttribute("data-mode")); }); });
 
-  // Menu: the exercises, then a link to the examples page. Every protocol opens by #ex=NAME,
-  // in the menu or not: the examples page links to the others that way.
+  // Menu: the exercises, the examples page's cards, then a link to the page. Every protocol
+  // opens by #ex=NAME, in the menu or not: the examples page links to the others that way.
   var byId = {}, sel = $("examples"), MORE = "examples.html";
   function fillMenu(list){
     var E = window.MMST.examples;
     list.forEach(function(x){ byId[x.id] = x; });
-    (E ? E.arrange(list, false).filter(function(g){ return /^Exercise \d+$/.test(g.group); })
+    (E ? E.arrange(list, false).filter(function(g){ return /^Exercise \d+$/.test(g.group) || g.group === "Examples"; })
        : [{ group: "Protocols", items: list }]).forEach(function(g){
       if (!g.items.length) return;
       var og = document.createElement("optgroup");
-      og.label = g.group;
+      og.label = (E && E.menu[g.group]) || g.group;
       g.items.forEach(function(x){
         var o = document.createElement("option");
         o.value = x.id; o.textContent = E ? E.title(x.id) : x.id;
@@ -431,8 +428,8 @@
     sel.appendChild(rule); sel.appendChild(more);
   }
 
-  // From the menu or #ex=NAME[&view=efsm]; the hash names it until the first edit.
-  function load(id, v){
+  // From the menu or #ex=NAME[&view=efsm[&role=R]]; the hash names it until the first edit.
+  function load(id, v, role){
     var x = byId[id];
     if (!x) return false;
     src.value = x.source;
@@ -441,7 +438,7 @@
     sel.value = id;
     if (sel.value !== id) sel.value = "";                 // not in the menu: show its prompt
     history.replaceState(null, "", "#ex=" + encodeURIComponent(id));
-    if (VIEWS[v]) VIEWS[v](); else idle();
+    if (v === "efsm") showEFSMs(role); else if (VIEWS[v]) VIEWS[v](); else idle();
     return true;
   }
   sel.addEventListener("change", function(){
@@ -462,6 +459,7 @@
   var hash = location.hash;
   var p = /[#&]p=([A-Za-z0-9_-]+)/.exec(hash), seeded = p && decode(p[1]);
   var ex = /[#&]ex=([^&]+)/.exec(hash), wanted = /[#&]view=(checks|efsm|erlang)(?:&|$)/.exec(hash);
+  var wantRole = /[#&]role=([^&]+)/.exec(hash);
   $("kbdhint").textContent = document.querySelector("#erl-run .kbd").textContent = MAC ? "\u2318\u21A9" : "Ctrl+\u21A9";
 
   window.MMST.erlang.init({
@@ -469,21 +467,24 @@
     protocol: function(){ return src.value; },
     moduleName: moduleName,
     hasProtocol: function(id){ return !!byId[id]; },
-    openProtocol: function(id){ shown = true; setMode("protocol"); if (!load(id)) idle(); }
+    openProtocol: function(id){ shown = true; editor(true); setMode("protocol"); if (!load(id)) idle(); },
+    showEditor: function(){ editor(true); }
   });
   var erl = /[#&]mode=erlang(?:&|$)/.test(hash), erlId = /[#&]erl=([^&]+)/.exec(hash);
 
-  src.value = seeded || loadDraft() || SEED;
+  src.value = seeded || loadDraft() || "";
   syncName();
   syncHighlight();
   window.MMST.lineNumbers(src, hl);
-  // Start: #mode=erlang, else #p=, else #ex= (once the menu is in), else the draft or the starter.
+  // Start: #mode=erlang, else #p=, else #ex= (once the menu is in) unless reloaded, else the
+  // draft, else empty.
+  if (ex && !erl && navType() === "reload") { ex = null; history.replaceState(null, "", location.pathname + location.search); }
   if (erl) {
     menu["catch"](function(){});
     setMode("erlang", erlId ? unescapeHash(erlId[1]) : undefined);
   } else if (ex && !seeded) {
     menu.then(function(){
-      if (load(unescapeHash(ex[1]), wanted && wanted[1])) return;
+      if (load(unescapeHash(ex[1]), wanted && wanted[1], wantRole ? unescapeHash(wantRole[1]) : null)) return;
       history.replaceState(null, "", location.pathname + location.search);   // no such example
       idle();
     }, idle);

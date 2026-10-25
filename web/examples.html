@@ -9,12 +9,24 @@
 <script src="vendor/marked.umd.js"></script>
 <script src="shared.js"></script>
 <script src="examples.js"></script>
+<script src="sides.js"></script>
 <style>
 /* Protocols from /api/examples; descriptions from text/examples.md, read by examples.js. */
 body{height:auto; min-height:100vh}
 .doc .col{max-width:48rem}
-.doc nav.jump{display:flex; flex-wrap:wrap; gap:.3rem 1.3rem; margin:-.5rem 0 .6rem; font-family:var(--mono); font-size:.74rem}
-.doc p.intro{margin:-.1rem 0 1rem}
+.doc nav.jump{display:flex; flex-wrap:wrap; gap:.3rem 1.3rem; margin:-.25rem 0 .6rem; font-family:var(--mono); font-size:.74rem}
+/* a group's introduction: Markdown from text/examples.md, whole */
+.doc .intro{margin:-.1rem 0 1rem}
+.doc .intro p{margin:0 0 .6rem}
+.doc .intro ol, .doc .intro ul{margin:0 0 .8rem; padding-left:1.5rem}
+.doc .intro li{margin:.35rem 0; padding-left:.2rem}
+.doc .intro ol > li{margin:.8rem 0}
+.doc .intro ol > li::marker{font-family:var(--mono); color:var(--ink-3)}
+.doc .intro li p{margin:0 0 .45rem}
+.doc .intro table{border-collapse:collapse; margin:.4rem 0 .7rem; font-size:.92em}
+.doc .intro th, .doc .intro td{text-align:left; padding:.25rem 1.1rem .25rem 0; border-bottom:1px solid var(--rule); vertical-align:top}
+.doc .intro th{font-family:var(--mono); font-size:.84em; font-weight:400; color:var(--ink-3)}
+.doc .intro pre.code{margin:.45rem 0 .8rem; padding:.65rem 1rem}
 .doc .note{background:var(--card); border:1px solid var(--rule); border-left:3px solid var(--rhs); border-radius:0; padding:.8rem 1rem; margin:0 0 1.4rem}
 
 /* featured: cards */
@@ -30,7 +42,7 @@ body{height:auto; min-height:100vh}
 .ex .lbl{font-family:var(--mono); font-size:.63rem; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); margin-right:.55rem}
 .ex .try{border-top:1px dashed var(--rule-2); padding-top:.65rem; margin-top:.15rem}
 .ex details{margin:0 0 .45rem}
-.ex details summary{font-family:var(--mono); font-size:.72rem; color:var(--ink-3); cursor:pointer; list-style:none; width:max-content; max-width:100%}
+.ex details summary{font-family:var(--mono); font-size:.72rem; color:var(--ink-3); cursor:pointer; list-style:none; width:max-content; max-width:100%; overflow-wrap:anywhere}
 .ex details summary::-webkit-details-marker{display:none}
 .ex details summary::before{content:"\25B8\00a0"; color:var(--rhs)}
 .ex details[open] summary::before{content:"\25BE\00a0"}
@@ -61,7 +73,6 @@ body{height:auto; min-height:100vh}
   <div class="col">
 
     <h1 class="title">Examples</h1>
-    <p class="lede">What each protocol models, where its mixed choices are, and what to look at.</p>
     <nav class="jump" id="jump" aria-label="Sections"></nav>
 
     <div id="groups"><p>Loading&hellip;</p></div>

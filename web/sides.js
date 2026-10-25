@@ -1,6 +1,5 @@
 /* The two runs (parts/two-runs.html): a tab replays the left or the right run, and the
-   dot on a role's line fills when that role commits. Starts once MMST.ready settles;
-   on the slides, a run replays when its slide is shown. */
+   dot on a role's line fills when that role commits. Starts once MMST.ready settles. */
 (function(){
   "use strict";
   var MMST = window.MMST = window.MMST || {};
@@ -36,7 +35,8 @@
       b.addEventListener("click", function(){ play(b.dataset.run); });
     });
     box.sidesPlay = play;
-    play("lhs");
+    var start = box.parentNode && box.parentNode.getAttribute ? box.parentNode.getAttribute("data-start") : null;
+    play(start === "rhs" ? "rhs" : "lhs");          // data-start="rhs" on the part's container: the right run first
   }
 
   MMST.sides = function(root){ each((root || document).querySelectorAll(".sides"), setup); };

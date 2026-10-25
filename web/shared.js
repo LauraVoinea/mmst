@@ -1,6 +1,6 @@
-/* Shared by all pages: theme, the four checks, highlighting, editor line numbers, and the
-   parts every page pulls in: header.html, footer.html, Markdown text (data-md) and HTML parts
-   (data-include). MMST.ready settles once they are all in place. */
+/* Shared by all pages: theme, the four checks, highlighting, local types, editor line
+   numbers, and the parts every page pulls in: header.html, footer.html, Markdown text
+   (data-md) and HTML parts (data-include). MMST.ready settles once they are all in place. */
 (function(){
   "use strict";
 
@@ -70,6 +70,94 @@
     return out;
   };
 
+  // A local type as the checker prints it, B⊕a1() . [ … ▷1_B … ], in the paper's notation:
+  // B ⊕ a1 . … ▷ …, spaced, without empty () or the outer brackets of a mixed choice. Labels
+  // take the colour of their side of the innermost mixed choice; ▷ is numbered only when the
+  // type has several. Branches l(): T read l . T. Each action carries where it is, for the
+  // EFSM view: data-act "role ! label" or "role ? label", data-mc and data-side, the innermost
+  // mixed choice and its side. The playground's local types, its EFSM view, and ```local.
+  var LT =/▷(\d+)_([A-Za-z_][A-Za-z0-9_]*)|([⊕&])|([\[\]{},:.])|\(([^()]*)\)|([A-Za-z0-9_]+)|(\s+)|([^])/g;
+  MMST.localType = function(text){
+    var esc = escHtml, toks = [], m;
+    LT.lastIndex = 0;
+    while ((m = LT.exec(text))) {
+      if (m[1] !== undefined) toks.push({ t: "mc", n: m[1] });
+      else if (m[3]) toks.push({ t: "op", s: m[3] });
+      else if (m[4]) toks.push({ t: m[4] });
+      else if (m[5] !== undefined) toks.push({ t: "pay", s: m[5].trim() });
+      else if (m[6]) toks.push({ t: "w", s: m[6] });
+      else if (!m[7]) toks.push({ t: "x", s: m[8] });
+    }
+    // The bracket pair around the whole type, if any, is left out.
+    var outer = -1, depth = 0, i;
+    if (toks.length && toks[0].t === "[") {
+      for (i = 0; i < toks.length; i++) {
+        if (toks[i].t === "[") depth++;
+        else if (toks[i].t === "]" && --depth === 0) break;
+      }
+      if (i === toks.length - 1) outer = i;
+    }
+    var many = toks.filter(function(k){ return k.t === "mc"; }).length > 1;
+    var stack = [], out = "", lab = false;            // lab: the next word is a label
+    var frames = [];                                  // mixed choices, in the order their [ opens
+    function frame(){
+      for (var j = stack.length - 1; j >= 0; j--) if (stack[j].mc) return stack[j];
+      return null;
+    }
+    function side(){ var fr = frame(); return fr ? fr.side : ""; }
+    function label(s){ return '<span class="lt-lab' + (side() ? " lt-" + side() : "") + '">' + esc(s) + "</span>"; }
+    function at(role, op, l){                         // its ▷ number is known only at the ▷: @n for now
+      var fr = frame();
+      return ' data-act="' + esc(role + (op === "⊕" ? " ! " : " ? ") + l) + '" data-mc="' + (fr ? "@" + fr.n : "0") +
+             '" data-side="' + (fr ? fr.side : "") + '"';
+    }
+    for (i = 0; i < toks.length; i++) {
+      var k = toks[i], next = toks[i + 1];
+      if (k.t === "w") {
+        if (lab) { out += label(k.s); lab = false;
+          if (next && next.t === "pay") { i++; if (next.s) out += '<span class="lt-pay">(' + esc(next.s) + ")</span>"; }
+          out += "</span>"; }
+        else if (next && next.t === "op") {
+          var l2 = toks[i + 2];
+          out += '<span class="lt-act"' + (l2 && l2.t === "w" ? at(k.s, next.s, l2.s) : "") + '><b class="lt-role">' + esc(k.s) + "</b>";
+        }
+        else if (k.s === "end") out += '<span class="lt-end">end</span>';
+        else if (k.s === "rec" && next && next.t === "w") { out += '<span class="lt-kw">μ</span><i class="lt-var">' + esc(next.s) + "</i>"; i++; }
+        else if (stack.length && !stack[stack.length - 1].mc && stack[stack.length - 1].head) {
+          var ch = stack[stack.length - 1];
+          out += '<span class="lt-act"' + at(ch.role, ch.op, k.s) + '>' + label(k.s);   // a branch's label
+          if (next && next.t === "pay") { i++; if (next.s) out += '<span class="lt-pay">(' + esc(next.s) + ")</span>"; }
+          out += "</span>";
+          stack[stack.length - 1].head = false;
+        }
+        else out += '<i class="lt-var">' + esc(k.s) + "</i>";
+      }
+      else if (k.t === "op") {                                 // closes the action's span before a {
+        lab = !(next && next.t === "{");
+        out += ' <span class="lt-op">' + k.s + "</span>" + (lab ? " " : "</span> ");
+      }
+      else if (k.t === "." || k.t === ":") out += '&nbsp;<span class="lt-dot">.</span> ';   // l(): T reads l . T
+      else if (k.t === "mc") {
+        if (stack.length && stack[stack.length - 1].mc) { stack[stack.length - 1].side = "r"; stack[stack.length - 1].id = k.n; }
+        out += ' <span class="lt-op lt-mc" data-mc="' + esc(k.n) + '">▷' + (many ? "<sub>" + k.n + "</sub>" : "") + "</span> ";
+      }
+      else if (k.t === "[") {
+        stack.push({ mc: true, side: "l", n: frames.length }); frames.push(stack[stack.length - 1]);
+        if (i !== 0 || outer < 0) out += '<span class="lt-brk">[</span>';
+      }
+      else if (k.t === "]") { stack.pop(); if (i !== outer) out += '<span class="lt-brk">]</span>'; }
+      else if (k.t === "{") {                                   // a choice: its role and ⊕ or & are just before
+        stack.push({ mc: false, head: true, role: toks[i - 2] ? toks[i - 2].s : "", op: toks[i - 1] ? toks[i - 1].s : "" });
+        out += '<span class="lt-brk">{</span> ';
+      }
+      else if (k.t === "}") { stack.pop(); out += ' <span class="lt-brk">}</span>'; }
+      else if (k.t === ",") { if (stack.length && !stack[stack.length - 1].mc) stack[stack.length - 1].head = true; out += '<span class="lt-brk">,</span> '; }
+      else if (k.t === "pay") { if (k.s) out += '<span class="lt-pay">(' + esc(k.s) + ")</span>"; }
+      else out += esc(k.s);
+    }
+    return out.replace(/data-mc="@(\d+)"/g, function(_, n){ return 'data-mc="' + (frames[+n].id || "") + '"'; });
+  };
+
   // Line numbers for an editor (div.lnum): a textarea over its highlighted <code>, as in
   // index.html. The highlight is redrawn after every change to the text, so each redraw
   // recounts; the textarea's scroll moves the numbers. A line marked in the highlight
@@ -127,10 +215,30 @@
     }));
   };
 
+  // Code in el: ```scribble and ```erlang highlighted, ```types in the paper's notation, and
+  // ```local, a local type a line as the checker prints it, shown as the playground shows it.
+  // ✓ and ✗ are coloured in any code; `⊕`, `&`, `▷` in the text.
+  MMST.code = function(el){
+    each(el.querySelectorAll("pre > code"), function(c){
+      var lang = /language-(scribble|erlang|types|local)/.exec(c.className);
+      if (!lang) c.innerHTML = c.innerHTML.replace(/[✓✗]/g, function(x){ return '<span class="' + MARKS[x] + '">' + x + '</span>'; });
+      else if (lang[1] === "types") c.innerHTML = MMST.highlightTypes(c.textContent);
+      else if (lang[1] === "local") {
+        c.parentNode.classList.add("lt");
+        c.innerHTML = c.textContent.replace(/\s+$/, "").split("\n").map(MMST.localType).join("\n");
+      }
+      else c.innerHTML = MMST.highlight(c.textContent, lang[1]);
+    });
+    each(el.querySelectorAll(":not(pre) > code"), function(c){
+      var cls = MARKS[c.textContent.trim()];
+      if (cls) c.classList.add(cls);
+    });
+  };
+
   // Markdown into el, with marked (vendor/marked.umd.js). Additions:
   //   "{.lede} text"   a paragraph starting with classes gets them;
   //   "{.reading}"     a paragraph of classes alone gives them to the next element;
-  //   ```scribble, ```erlang and ```types code is highlighted; ✓ and ✗ are coloured in any code;
+  //   code is coloured by MMST.code;
   //   on reading pages (opts.doc), # is the title, ## a section heading, ``` a code block.
   var MARK = /^\{((?:\s*\.[\w-]+)+)\s*\}\s*/;
   MMST.marks = function(el){
@@ -149,16 +257,7 @@
     opts = opts || {};
     el.innerHTML = window.marked.parse(src);
     MMST.marks(el);
-    each(el.querySelectorAll("pre > code"), function(c){
-      var lang = /language-(scribble|erlang|types)/.exec(c.className);
-      if (!lang) c.innerHTML = c.innerHTML.replace(/[✓✗]/g, function(x){ return '<span class="' + MARKS[x] + '">' + x + '</span>'; });
-      else if (lang[1] === "types") c.innerHTML = MMST.highlightTypes(c.textContent);
-      else c.innerHTML = MMST.highlight(c.textContent, lang[1]);
-    });
-    each(el.querySelectorAll(":not(pre) > code"), function(c){       // `⊕` and the like, in the text
-      var cls = MARKS[c.textContent.trim()];
-      if (cls) c.classList.add(cls);
-    });
+    MMST.code(el);
     if (opts.doc) {
       each(el.querySelectorAll("h1"), function(h){ h.classList.add("title"); });
       each(el.querySelectorAll("h2"), function(h){ h.classList.add("sec"); });
@@ -189,6 +288,16 @@
       if (home && page === "index.html") {                // no link to the page you are on
         while (home.firstChild) home.parentNode.insertBefore(home.firstChild, home);
         home.parentNode.removeChild(home);
+      }
+      var ed = h.querySelector("a[data-editor]");
+      if (ed && page === "index.html") {                  // here, the button that hides and shows it (playground.js)
+        var eb = document.createElement("button");
+        eb.type = "button";
+        eb.setAttribute("data-editor", "");
+        eb.setAttribute("aria-pressed", "true");
+        eb.title = "Hide the editor";
+        eb.textContent = ed.textContent;
+        ed.parentNode.replaceChild(eb, ed);
       }
       var b = h.querySelector("#theme");
       if (b) b.addEventListener("click", function(){

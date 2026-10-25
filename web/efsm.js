@@ -2,17 +2,17 @@
    Labels:  "6[Stream] ▷1:"    state 6, binds rec Stream, mixed choice 1 starts here
             "7[] 1:"           in mixed choice 1 ("2[] 0:" outside)
             "9[] 1: Stream:"   continue Stream
-            "A?a1()/A!*TOa()"  event/action: τ internal, ? message arrival, ! send, ε empty,
+            "A?a1()/A!*TOa()"  event/action: 𝜏 internal, ? message arrival, ! send, ε empty,
                                * switch to the right side of the mixed choice.
-   Shown as in the paper's Figure 2: "B?a4()/ε" as "B?a4()", "B?TOa()/ε*" as "B?*TOa()",
-   "𝜏_a1/B!a1()" as "τ / B!a1()" (the subscript always repeats the message sent). */
+   Shown as in the paper's Figure 2, "B?a4()/ε" as "B?a4()" and "B?TOa()/ε*" as "B?*TOa()",
+   but τ in gen_statem's word: "𝜏_a1/B!a1()" as "internal / B!a1()". The subscript always
+   repeats the message sent. */
 (function(){
   "use strict";
 
   var MMST = window.MMST = window.MMST || {};
   var NS = "http://www.w3.org/2000/svg";
   var R = 18, DY = 112, PAD = 40;
-  var TAU = /𝜏/g;
   var NODE = /^(\S+?)\[([^\]]*)\]\s*(▷)?(\d+):\s*(?:([A-Za-z_][A-Za-z0-9_]*):)?\s*$/;
   var REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   var SIDE = { lhs: "left", rhs: "right", none: "outside", jump: "continue" };
@@ -31,8 +31,80 @@
     if (parent) parent.appendChild(e);
     return e;
   }
-  function pretty(s){ return String(s || "").replace(TAU, "τ"); }
   function f(v){ return Math.round(v * 10) / 10; }
+  function labelOf(e){ return e.jump || !e.action ? e.event : e.event + " / " + e.action; }
+
+  // A label in the local types' colours: roles bold, ? ! * as operators, messages in the
+  // colour of their side, payloads and keywords quieter. Kinds: role op lab pay kw var dot.
+  // A message is on the right if marked *; one in the same switch without * is on the left.
+  var MSG = /^([A-Za-z_][A-Za-z0-9_]*)([?!]\*?)([A-Za-z0-9_]+)(\(.*\))?$/;
+  function parts(s, e){
+    var m = MSG.exec(s), c;
+    if (m) return [["role", m[1]], ["op", m[2]], ["lab", m[3], m[2].length > 1 ? "rhs" : e.toRight ? "lhs" : e.side],
+                   ["pay", m[4] || ""]];
+    if ((c = /^continue (\S+)$/.exec(s))) return [["kw", "continue "], ["var", c[1]]];
+    if (s === "internal") return [["kw", s]];
+    return [["", s]];
+  }
+  function whole(e){ return e.jump || !e.action ? parts(e.event, e) : parts(e.event, e).concat(SLASH, parts(e.action, e)); }
+  var SLASH = [["", " "], ["dot", "/"], ["", " "]];
+  function tspans(text, list){                                  // SVG
+    list.forEach(function(p){
+      if (p[1]) svg("tspan", p[0] ? { "class": "t-" + p[0] + (p[2] ? " " + p[2] : "") } : null, text).textContent = p[1];
+    });
+  }
+  function spans(el, list){                                     // HTML, with the local types' classes
+    list.forEach(function(p){
+      if (!p[1]) return;
+      if (p[0] === "role") tag("b", "lt-role", p[1], el);
+      else if (p[0] === "var") tag("i", "lt-var", p[1], el);
+      else if (p[0] === "lab") tag("span", "lt-lab" + (p[2] === "lhs" ? " lt-l" : p[2] === "rhs" ? " lt-r" : ""), p[1], el);
+      else tag("span", p[0] ? "lt-" + p[0] : null, p[1], el);
+    });
+  }
+
+  // The local type's actions an edge takes: "role ! label" or "role ? label", in which mixed
+  // choice and on which side, as MMST.localType marks them.
+  function acts(e){
+    var out = [], mc = String(e.from.mc || 0);
+    [e.event, e.action].forEach(function(s){
+      var m = MSG.exec(s || "");
+      if (!m) return;
+      var side = m[2].length > 1 ? "rhs" : e.toRight ? "lhs" : e.side;
+      out.push({ key: m[1] + " " + m[2][0] + " " + m[3], mc: mc, side: side === "lhs" ? "l" : side === "rhs" ? "r" : "" });
+    });
+    return out;
+  }
+
+  // An edge's code in the generated files: its clause of the state's function in
+  // gen_<role>.erl, the callback's in <role>.erl, and the send, if it sends.
+  function reEsc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+  function clause(text, re){                                    // from its head to the next line at column 0
+    var lines = text.split("\n");
+    for (var i = 0; i < lines.length; i++) if (re.test(lines[i])) {
+      var j = i + 1;
+      while (j < lines.length && !/^\S/.test(lines[j])) j++;
+      while (j > i + 1 && !lines[j - 1].trim()) j--;
+      return { text: lines.slice(i, j).join("\n"), line: i + 1, to: j };
+    }
+    return null;
+  }
+  function clauses(files, role, e){
+    var lower = String(role).toLowerCase(), st = "s" + e.from.id, out = [];
+    function file(n){ return files.filter(function(f){ return f.name.toLowerCase() === n; })[0]; }
+    var gen = file("gen_" + lower + ".erl"), cb = file(lower + ".erl");
+    var ev = MSG.exec(e.event || ""), ac = MSG.exec(e.action || "");
+    var head = ev ? new RegExp("^" + st + "\\(cast,\\s*\\{[^{]*\\{'?" + reEsc(ev[3]) + "'?[,}]")
+             : ac ? new RegExp("^" + st + "\\(internal,\\s*\\{'?" + reEsc(ac[3]) + "'?[,}]") : null;
+    function add(f, re, fn, note){
+      var c = f && re && clause(f.content, re);
+      if (c) out.push({ file: f.name, fn: fn, note: note, text: c.text, line: c.line, to: c.to });
+    }
+    add(gen, head, st + "/3", "state " + e.from.id + ", generated");
+    add(cb, head, st + "/3", "your callback");
+    if (ac) add(gen, new RegExp("^send_" + st + "_" + reEsc(ac[3]) + "\\("), "send_" + st + "_" + ac[3] + "/2", "the send, generated");
+    return out;
+  }
 
   /* model */
   function model(m){
@@ -54,8 +126,8 @@
         if (toRight) ev = ev.replace("?", "?*");
         act = "";
       }
-      if (/^𝜏_/.test(ev)) ev = "𝜏";                              // plain τ, as in the paper
-      var e = { from: a, to: b, label: label, event: pretty(ev), action: pretty(act), toRight: toRight };
+      if (/^𝜏/.test(ev)) ev = "internal";                        // τ in the paper
+      var e = { from: a, to: b, label: label, event: ev, action: act, toRight: toRight };
       edges.push(e); a.out.push(e); b.inn.push(e);
     });
     var start = nodes[0] || null;                               // initial state first
@@ -201,7 +273,7 @@
     else if (n.mc > 0) s += ": in mixed choice " + n.mc + (n.rhs ? ", right" : "");
     else s += ": outside mixed choice";
     if (n.rec.length) s += "; binds rec " + n.rec.join(", ");
-    return s + "\n" + n.label;
+    return s;
   }
 
   /* draw */
@@ -238,12 +310,12 @@
       var lg = svg("g", { "class": "lbl " + e.side, transform: "translate(" + f(e.lx) + "," + f(e.ly) + ")" }, gL);
       svg("rect", { x: f(-e.lw / 2), y: f(-e.lh / 2), width: f(e.lw), height: e.lh, rx: 4 }, lg);
       if (e.jump || !e.action) {
-        svg("text", { y: 4, "class": "ev" }, lg).textContent = e.event;
+        tspans(svg("text", { y: 4, "class": "ev" }, lg), parts(e.event, e));
       } else {
-        svg("text", { y: -3, "class": "ev" }, lg).textContent = e.event;
-        svg("text", { y: 11, "class": "ac" }, lg).textContent = "/ " + e.action;
+        tspans(svg("text", { y: -3, "class": "ev" }, lg), parts(e.event, e));
+        tspans(svg("text", { y: 11, "class": "ac" }, lg), SLASH.slice(1).concat(parts(e.action, e)));
       }
-      svg("title", null, lg).textContent = e.jump ? e.event : e.label + "  ·  " + SIDE[e.side];
+      svg("title", null, lg).textContent = e.jump ? e.event : labelOf(e) + "  ·  " + SIDE[e.side];
       e.lbl = lg;
       grow(e.lx - e.lw / 2, e.ly - e.lh / 2, e.lx + e.lw / 2, e.ly + e.lh / 2);
     });
@@ -256,7 +328,7 @@
       svg("circle", { r: R, "class": "ring" }, ng);
       if (n.end) svg("circle", { r: R - 4.5, "class": "inner" }, ng);
       svg("text", { y: 4, "class": "sid" }, ng).textContent = n.id;
-      if (n.entry) svg("text", { y: -R - 8, "class": "badge" }, ng).textContent = "▷" + n.mc;
+      if (n.entry) svg("text", { y: -R - 8, "class": "badge mc" }, ng).textContent = "▷" + n.mc;
       if (n.jump)  svg("text", { y: R + 15, "class": "badge" }, ng).textContent = "↺ " + n.cont;
       svg("title", null, ng).textContent = describe(n);
       n.el = ng;
@@ -304,6 +376,7 @@
     function take(e, done){
       if (busy || !alive()) return;
       busy = true; mark();
+      ui.select(e);                                             // at the start: a later click can change it
       e.path.classList.add("hot"); e.lbl.classList.add("hot");
       token.classList.add("on");
       var len = e.path.getTotalLength(), ms = REDUCED ? 0 : Math.max(450, Math.min(950, len * 3.2)), t0 = null;
@@ -352,8 +425,9 @@
         take(e, function(){ if (playing) timer = setTimeout(next, REDUCED ? 250 : 380); });
       })();
     }
-    all.forEach(function(e){                                   // click a highlighted step to take it
+    all.forEach(function(e){                                   // click: select it; a highlighted one, take it too
       function click(){
+        ui.select(e);
         if (busy || nexts().indexOf(e) < 0) return;
         setPlaying(false); clearTimeout(timer);
         take(e);
@@ -371,7 +445,10 @@
   }
 
   /* ui */
-  function render(host, machines){
+  // opts: role, the one to show first; types() and code(), promises of the local types by
+  // role and of the generated files; openCode(file, line, to), to open a file at a clause.
+  function render(host, machines, opts){
+    opts = opts || {};
     gen++;
     host.innerHTML = "";
     var wrap = tag("div", "efsm", null, host);
@@ -382,47 +459,115 @@
     var ctl = tag("div", "efsm-ctl", null, top);
     var bPlay = tag("button", "btn", "▶ Play", ctl), bStep = tag("button", "btn", "Step", ctl),
         bReset = tag("button", "btn", "Reset", ctl);
-    tag("p", "efsm-note", "The state machine each gen_<role>.erl implements. Play, Step, or click a highlighted transition.", wrap);
+    tag("p", "efsm-note", "The state machine each gen_<role>.erl implements. Click a transition to see its action " +
+        "in the local type and its code below. Play, Step, or click a highlighted transition to run it.", wrap);
+    var typeEl = tag("div", "efsm-type", null, wrap);
+    typeEl.hidden = true;
     var canvas = tag("div", "efsm-canvas", null, wrap);
+    var codeEl = tag("div", "efsm-code", null, wrap);
+    codeEl.hidden = true;
     var trace = tag("div", "efsm-trace", null, wrap);
     tag("span", "lead", "run", trace);
     var ol = tag("ol", null, null, trace);
     var legend = tag("div", "efsm-legend", null, wrap);
     legend.innerHTML =
-      '<span><i class="sw lhs"></i>left</span>' +
-      '<span><i class="sw rhs"></i>right, from the switch (<code>*</code>)</span>' +
+      '<span><i class="sw lhs"></i><span class="lt-lab lt-l">left</span></span>' +
+      '<span><i class="sw rhs"></i><span class="lt-lab lt-r">right</span>, from the switch <code class="lt-op">*</code></span>' +
       '<span><i class="sw none"></i>outside</span>' +
-      '<span><i class="sw jump"></i><code>continue</code></span>' +
-      '<span class="row">event <code>/</code> action &middot; event: <code>τ</code> internal, <code>?</code> message arrival ' +
-      '&middot; action: <code>!</code> send, <code>ε</code> empty</span>' +
-      '<span class="row"><code>?</code> alone means <code>? / ε</code> &middot; <code>*</code> switch to the right</span>' +
-      '<span class="row"><code>▷1</code> mixed choice 1 starts here &middot; double ring: terminal</span>';
+      '<span><i class="sw jump"></i><code class="lt-kw">continue</code></span>' +
+      '<span class="row">event <code class="lt-dot">/</code> action &middot; event: <code class="lt-op">?</code> message arrival, ' +
+      '<code class="lt-kw">internal</code> the role\'s own step &middot; action: <code class="lt-op">!</code> send</span>' +
+      '<span class="row"><code class="lt-op">?</code> alone: no action &middot; <code class="lt-op">*</code> switch to the right</span>' +
+      '<span class="row"><code class="lt-op">▷1</code> mixed choice 1 starts here &middot; double ring: terminal</span>';
 
     var protos = {};
     machines.forEach(function(m){ protos[m.protocol] = true; });
     var many = Object.keys(protos).length > 1;
-    var run = null, buttons = [];
+    var run = null, buttons = [], role = null, selected = null, asked = 0;
 
     var ui = {
-      clear: function(){ ol.innerHTML = ""; tag("li", "empty", "nothing yet", ol); },
+      clear: function(){ ol.innerHTML = ""; tag("li", "empty", "nothing yet", ol); select(null); },
       push: function(e){
         var first = ol.querySelector(".empty"); if (first) ol.removeChild(first);
-        tag("li", e.side, e.jump || !e.action ? e.event : e.event + " / " + e.action, ol);
+        spans(tag("li", e.side, null, ol), whole(e));
       },
+      select: function(e){ select(e); },
       done: function(){ tag("li", "end", "■ end", ol); },
       playing: function(on){ bPlay.textContent = on ? "❚❚ Pause" : "▶ Play"; }
     };
 
+    // The selected transition: its actions lit in the local type, its code below the diagram.
+    function select(e){
+      if (e === selected) return;
+      if (selected) { selected.lbl.classList.remove("sel"); selected.path.classList.remove("sel"); }
+      selected = e || null;
+      if (selected) { selected.lbl.classList.add("sel"); selected.path.classList.add("sel"); }
+      light();
+      code();
+    }
+    function light(){
+      Array.prototype.forEach.call(typeEl.querySelectorAll(".on"), function(x){ x.classList.remove("on"); });
+      var e = selected;
+      if (!e) return;
+      acts(e).forEach(function(a){
+        var q = '.lt-act[data-act="' + a.key + '"]';
+        var hit = typeEl.querySelectorAll(q + '[data-mc="' + a.mc + '"][data-side="' + a.side + '"]');
+        if (!hit.length) hit = typeEl.querySelectorAll(q);
+        Array.prototype.forEach.call(hit, function(x){ x.classList.add("on"); });
+      });
+      var sw = e.toRight && typeEl.querySelector('.lt-mc[data-mc="' + e.from.mc + '"]');
+      if (sw) sw.classList.add("on");
+    }
+    function code(){
+      var e = selected, mine = ++asked;
+      codeEl.innerHTML = "";
+      codeEl.hidden = !e || !!e.jump;
+      if (codeEl.hidden) return;
+      var head = tag("div", "efsm-code-head", null, codeEl);
+      tag("span", "lead", "code", head);
+      spans(tag("span", "efsm-code-lbl", null, head), whole(e));
+      tag("span", "efsm-code-st", "from state " + e.from.id + " to " + e.to.id, head);
+      if (!opts.code) return;
+      var body = tag("div", "efsm-code-body", "…", codeEl);
+      opts.code().then(function(files){
+        if (mine !== asked) return;
+        body.textContent = "";
+        var cs = clauses(files || [], role, e);
+        if (!cs.length) { body.textContent = "No generated code for this transition."; return; }
+        cs.forEach(function(c){
+          var box = tag("div", "snip", null, body), h = tag("div", "snip-head", null, box);
+          tag("code", null, c.file, h);
+          tag("code", null, c.fn, h);
+          tag("span", null, c.note, h);
+          var a = tag("a", null, "line " + c.line, h);
+          a.href = "#";
+          a.title = "Open " + c.file + " in the Erlang tab";
+          a.addEventListener("click", function(ev){ ev.preventDefault(); if (opts.openCode) opts.openCode(c.file, c.line, c.to); });
+          tag("pre", "code", null, box).innerHTML = MMST.highlight(c.text, "erlang");
+        });
+      }, function(){ if (mine === asked) body.textContent = "No generated code: the server did not answer."; });
+    }
+
     function show(i){
       gen++;
       var mine = gen, g = model(machines[i]);
+      role = machines[i].role;
+      selected = null;
       buttons.forEach(function(b, j){ b.setAttribute("aria-selected", j === i ? "true" : "false"); });
       g.edges.concat(g.jumps).forEach(measure); layout(g); route(g); relax(g.edges.concat(g.jumps));
       canvas.innerHTML = "";
       var d = draw(g);
       canvas.appendChild(d.root);
       drawIn(g);
+      typeEl.hidden = true;
+      typeEl.innerHTML = "";
       run = runner(g, d.token, ui, mine);
+      if (opts.types && MMST.localType) opts.types().then(function(t){
+        if (mine !== gen || !t || !t[role]) return;
+        typeEl.innerHTML = '<span class="lead">local type</span><code class="ty">' + MMST.localType(t[role]) + "</code>";
+        typeEl.hidden = false;
+        light();
+      }, function(){});
     }
 
     machines.forEach(function(m, i){
@@ -434,7 +579,9 @@
     bPlay.addEventListener("click", function(){ if (!run) return; if (run.playing()) run.pause(); else run.play(); });
     bStep.addEventListener("click", function(){ if (run) run.step(); });
     bReset.addEventListener("click", function(){ if (run) run.reset(); });
-    if (machines.length) show(0);
+    var first = -1;
+    machines.forEach(function(m, i){ if (first < 0 && opts.role && m.role === opts.role) first = i; });
+    if (machines.length) show(Math.max(0, first));
   }
 
   MMST.efsm = { render: render };

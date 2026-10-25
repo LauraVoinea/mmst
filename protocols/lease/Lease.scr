@@ -1,0 +1,26 @@
+module Lease;
+
+// Figure 1's Timeout as a lease; the Erlang mode's lease set runs it.
+// Client renews its lease with LockService and sends a write to Storage at the same
+// time. LockService observes: it renews the lease if the renewal comes in time
+// (left), or lets the lease expire, tells Client, and fences Storage (right).
+// Storage holds the write until it hears from LockService: it applies it under a
+// valid lease, and drops it when fenced.
+//
+// Figure 1:  A Client, B LockService, C Storage;  a1 renew, a2 write, a3 valid,
+//            a4 renewed, a5 written, TOa expired, TOc fence.
+
+data <erlang> "integer()" from "rt.jar" as value;
+
+global protocol Lease(role Client, role LockService, role Storage) {
+    mixed {                            // left
+        renew() from Client to LockService;
+        write(value) from Client to Storage;
+        valid() from LockService to Storage;
+        renewed() from LockService to Client;
+        written() from Storage to Client;
+    } or Client -> LockService {       // right: LockService overrules Client
+        expired() from LockService to Client;
+        fence() from LockService to Storage;
+    }
+}

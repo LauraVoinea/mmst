@@ -1,0 +1,21 @@
+module Retry;
+
+// Timeout, started again after each overrule; the Erlang mode's retry set runs it.
+// A goes along at once: it sends a1 to B and a2 to C. B observes: it goes along if
+// a1 comes in time (left), or overrules, and the three start again (right).
+
+global protocol Retry(role A, role B, role C) {
+    rec Again {
+        mixed {                       // left
+            a1() from A to B;
+            a2() from A to C;
+            a3() from B to C;
+            a4() from B to A;
+            a5() from C to A;
+        } or A -> B {                 // right: B overrules A, and they start again
+            TOa() from B to A;
+            TOc() from B to C;
+            continue Again;
+        }
+    }
+}

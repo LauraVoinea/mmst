@@ -56,15 +56,22 @@
       var id = slug(g.group), name = HEADINGS[g.group] || g.group.toLowerCase();
       nav.push('<a href="#' + id + '">' + esc(name) + '</a>');
       h += '<section id="' + id + '"><h3 class="sec">' + esc(name) + '</h3>' +
-           (E.groups[g.group] ? '<p class="intro">' + E.groups[g.group] + '</p>' : '') +
+           (E.groups[g.group] ? '<div class="intro">' + E.groups[g.group] + '</div>' : '') +
            (g.group === "Examples" ? g.items.map(card).join("")
                                    : '<ul class="rows">' + g.items.map(row).join("") + '</ul>') + '</section>';
     });
     $("groups").innerHTML = h;
+    window.MMST.code($("groups"));                    // the introductions' ```local, `▷` and the like
+    Array.prototype.forEach.call($("groups").querySelectorAll(".intro pre"), function(p){ p.classList.add("code"); });
     $("jump").innerHTML = nav.join("");
-    // The anchor lookup ran before the content: scroll again.
-    var t = location.hash.length > 1 && document.getElementById(decodeURIComponent(location.hash.slice(1)));
-    if (t) t.scrollIntoView();
+    // HTML parts in the introductions (Exercise 3's two runs), then the anchor: its lookup
+    // ran before the content, so scroll again.
+    function settle(){
+      if (window.MMST.sides) window.MMST.sides($("groups"));
+      var t = location.hash.length > 1 && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (t) t.scrollIntoView();
+    }
+    window.MMST.include($("groups")).then(settle, settle);
   }
 
   // Offline: descriptions only, grouped as in text/examples.md.

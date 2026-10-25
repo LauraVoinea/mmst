@@ -1,0 +1,9 @@
+{application, retry,
+ [{description, "Figure 1's Timeout, started again after each overrule"},
+  {vsn, "0.1.0"},
+  {registered, [a, b, c]},
+  {mod, {retry_app, []}},
+  {applications, [kernel, stdlib]},
+  {env, []},
+  {modules, []}
+ ]}.

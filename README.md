@@ -38,8 +38,9 @@ The classpath is cached in `.classpath`. Erlang runs need `erl` and `erlc` on th
 | `Dockerfile`, `container.sh`, `nonet.c` | the container image |
 | `deploy/` | a server of your own: the setup for Ubuntu 24.04, the service, `mmst-update` |
 | `exercises/` | the exercises in the menu |
-| `protocols/quote`, `erlang/quote` | Quote, Figure 1's Timeout as a price quote, and its Erlang, filled in |
-| `protocols/savina` | four Savina benchmarks as mixed choice, on the examples page |
+| `protocols/more` | more exercises, on the examples page |
+| `protocols/lease`, `erlang/lease` | Lease, Figure 1's Timeout as a lease, and its Erlang, filled in |
+| `protocols/retry`, `erlang/retry` | Retry, Figure 1's Timeout started again after each overrule, and its Erlang, filled in |
 
 ## API
 
@@ -59,9 +60,9 @@ heap cap. Responses are cached by protocol text. `-gt-check-fidelity` and
 
 ## Erlang mode
 
-Sets: this repository's `erlang/quote`, the artifact's filled-in apps (`examples/erlang`),
-whatever `./mMST.sh` wrote to `generated/`, and modules generated from the editor. Edits are
-kept per set for the session; `.zip` downloads them.
+Sets: this repository's `erlang/lease` and `erlang/retry`, the artifact's filled-in apps
+(`examples/erlang`), whatever `./mMST.sh` wrote to `generated/`, and modules generated from
+the editor. Edits are kept per set for the session; `.zip` downloads them.
 
 **Run** compiles every module in a fresh VM, `gen_` modules first, starts the roles from the
 `*_sup` child specs or else every `gen_` implementer, and reports each role as finished,
@@ -70,25 +71,15 @@ name OTP uses (role `server`, `gen_server`) is renamed for the run.
 
 ## Erlang runs
 
-A run executes what it is sent, so runs are off unless switched on:
+Runs are off unless switched on:
 
 | `MMST_ERLANG` | runs for |
 |---|---|
 | unset, `off` | nobody; the Erlang mode still opens and edits |
 | `1` | pages at `localhost` on the server's machine |
-| `all` | anyone who can reach the server: containers only |
+| `all` | anyone who can reach the server |
 
-Only the playground's own page may run code. Each run gets a fresh VM and folder, a 5 s
-deadline, 128 MB of heap per process, and 300 KB of output. The server also confines runs
-as far as the machine allows, probed at start-up:
-
-- own user per run, when the server is root (`setpriv`); leftovers killed and deleted
-- no network: an empty network namespace (`unshare`), else `mmst-nonet` (`nonet.c`), a seccomp filter
-- limits on memory, processes, open files, file size and CPU time (`prlimit`)
-
-The log and the Erlang mode say which apply; on a Mac, none. With `all`, runs stay off unless
-each gets its own user and no network. At start-up the server makes one trivial run, and
-switches runs off if it fails.
+If runs are off, the first lines of the server's log say why.
 
 ## Deploy
 
@@ -128,12 +119,11 @@ Linode:
    bash linode-setup.sh play.example.org
    ```
 
-The setup installs updates and turns on daily security updates, with a reboot at 03:30 UTC
-when one needs it. It adds 2 GB of swap and a firewall that lets in SSH, HTTP and HTTPS only,
-installs Docker and Caddy from Ubuntu, and turns SSH passwords off if root has a key. Then it
-builds the image from `main` on GitHub, starts the service and checks a protocol. It ends with
-the playground's first log lines, where runs should be on:
-`Each run: own user, no network, limits.` Run it again to change the hostname.
+The setup adds 2 GB of swap and a firewall that lets in SSH, HTTP and HTTPS only, installs
+Docker and Caddy from Ubuntu, and turns SSH passwords off if root has a key. Then it builds the
+image from `main` on GitHub, starts the service and checks a protocol. It ends with the
+playground's first log lines, where runs should be `on, for everyone`. Run it again to change
+the hostname.
 
 | On the server | |
 |---|---|
@@ -150,21 +140,3 @@ resize reboots the Linode, and the playground starts again at the new size.
 
 No certificate: check that the hostname points at the Linode, and that a Cloud Firewall, if
 the Linode has one, lets in ports 80 and 443; then `systemctl restart caddy`.
-
-## Security
-
-Requests are capped at 64 KB; checks at 15 s, 256 MB and 400 000 characters of output. Only
-`.scr` files directly in the exercise folders, `protocols/quote`, `protocols/savina` and
-`examples/scribble` are listed, by short path; no request chooses a file. Generated files are
-deleted after each response.
-
-Every response carries a Content-Security-Policy: the pages run only the scripts in `web/`, load
-only from the server, and only the server may frame them, so text from a shared link, the checker
-or a run cannot run as script. A page's script must therefore be a file, not inline. There is no
-CORS, so other sites' pages cannot call the API. Responses also send `nosniff`, a same-origin
-referrer policy and HSTS, which browsers ignore over plain HTTP.
-
-On a Linode, `deploy/run.sh` makes the container's file system read-only but for `/tmp`, which
-only the server can write, and the runs' folders. It drops every capability but the seven the
-server needs to give each run its own user and clean up after it, forbids gaining privileges, and
-caps the container at 1024 processes and threads.

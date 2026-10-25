@@ -1,14 +1,22 @@
-module d;
+module Timeout;
 
-// BROKEN. No mixed choice: an ordinary directed choice.
-// Predict what fails, and for whom. Then press Check, compare, and fix it.
+// BROKEN: Timeout, with B choosing between a4() and b4() after a3(); C answers A
+// only after a4().
+// Which safety properties fail, and why? Then press Check, compare, and fix it.
 
-global protocol Choice(role p, role q, role r) {
-    choice at p {
-        a() from p to q;
-        c() from q to r;
-    } or {
-        b() from p to q;
-        c() from q to p;
+global protocol Timeout(role A, role B, role C) {
+    mixed {
+        a1() from A to B;
+        a2() from A to C;
+        a3() from B to C;
+        choice at B {
+            a4() from B to A;
+            a5() from C to A;
+        } or {
+            b4() from B to A;
+        }
+    } or A -> B {
+        TOa() from B to A;
+        TOc() from B to C;
     }
 }

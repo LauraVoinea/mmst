@@ -1,16 +1,17 @@
-module c;
+module Timeout;
 
-// BROKEN. q may send a() to p; p, the observer, may overrule with c().
-// Predict what fails, and for whom. Then press Check, compare, and fix it.
+// BROKEN: Timeout, but on the right B sends C a2() instead of TOc().
+// Which safety properties fail, and why? Then press Check, compare, and fix it.
 
-global protocol Overrule(role p, role q, role r) {
+global protocol Timeout(role A, role B, role C) {
     mixed {
-        a() from q to p;
-        b() from q to r;
-        y() from p to r;
-        z() from p to q;
-    } or q -> p {
-        c() from p to q;
-        b() from q to r;
+        a1() from A to B;
+        a2() from A to C;
+        a3() from B to C;
+        a4() from B to A;
+        a5() from C to A;
+    } or A -> B {
+        TOa() from B to A;
+        a2() from B to C;
     }
 }

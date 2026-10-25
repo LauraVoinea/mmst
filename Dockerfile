@@ -1,4 +1,4 @@
-# The playground, with Erlang runs on for everyone, each confined (see README).
+# The playground, with Erlang runs on for everyone (see README).
 #
 #   docker build -t mmst-playground .
 #   docker run --rm -p 8080:10000 mmst-playground
@@ -68,9 +68,10 @@ COPY web /app/web
 COPY mmst_run.erl container.sh /app/
 COPY exercises/exercise1/*.scr /app/exercises/exercise1/
 COPY exercises/exercise2/*.scr /app/exercises/exercise2/
-COPY exercises/exercise4/*.scr /app/exercises/exercise4/
-COPY protocols/quote/*.scr /app/protocols/quote/
-COPY protocols/savina/*.scr /app/protocols/savina/
+COPY exercises/exercise3/*.scr /app/exercises/exercise3/
+COPY protocols/more/*.scr /app/protocols/more/
+COPY protocols/lease/*.scr /app/protocols/lease/
+COPY protocols/retry/*.scr /app/protocols/retry/
 COPY erlang /app/erlang
 RUN mkdir -p /var/lib/mmst/runs && chmod 711 /var/lib/mmst/runs \
  && chmod 755 /app/container.sh \

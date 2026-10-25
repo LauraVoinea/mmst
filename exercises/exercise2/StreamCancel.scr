@@ -4,9 +4,9 @@ module StreamCancel;
 //
 // A streaming RPC that sends one chunk and stops. Make Server send chunks
 // until Client cancels, with rec Name { ... continue Name; }. Keep all four
-// flags green.
+// checks passing.
 //
-// Then predict what fails, and for whom, check, and explain:
+// Then, for each change below, which safety properties fail, and why? Check and compare:
 //   1. the rec inside the left side, around its three messages only;
 //   2. Metrics told only about the cancel: no counted().
 

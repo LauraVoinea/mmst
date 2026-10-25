@@ -1,6 +1,7 @@
 <!-- The bar at the top of every page. shared.js puts it into <header id="site-header">;
      whatever the page already has in its header (the playground's mode tabs and menus)
-     takes the place of data-slot. The current page's link gets aria-current. -->
+     takes the place of data-slot. The current page's link gets aria-current. On the
+     playground, editor becomes the button that hides and shows the editor. -->
 <div class="brand">
   <a class="home" href="./" title="Playground">
     <svg width="42" height="20" viewBox="0 0 42 20" aria-hidden="true">
@@ -12,7 +13,8 @@
     <h1>mMST</h1>
   </a>
   <span class="sub">
-    <a href="mixed-choice.html" title="Mixed choice and the four checks">mixed choice</a>
+    <a href="./" data-editor title="The editor">editor</a>
+    <!-- out for now: <a href="mixed-choice.html" title="Mixed choice and the four checks">mixed choice</a> -->
     <a href="examples.html" title="The examples">examples</a>
   </span>
 </div>
