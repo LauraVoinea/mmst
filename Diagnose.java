@@ -51,7 +51,8 @@ import scala.jdk.javaapi.CollectionConverters;
  *
  * Runs Main. If Main throws: writes the problems to FILE as a JSON array (no FILE:
  * stdout, an "@@mmst {...}" line each), then rethrows, so output and exit code are Main's.
- * A problem: kind, protocol, line, head (the construct), text, and lines to mark, soft and hard.
+ * A problem: kind, protocol, line, head (the construct), text, and lines to mark: hard, the lines
+ * at fault; soft, the construct, or for SD, CT and BA the side or branch where a role is missing.
  *
  *   WF SD CT BA     per mixed choice, BA also per choice: the checker's own conditions,
  *                   on its own types
@@ -153,6 +154,11 @@ public final class Diagnose {
         return p;
     }
 
+    // SD, CT and BA are about a whole side or branch: their line and marks are that side or branch.
+    private P sideProblem(String kind, String protocol, GTGMixed x, CommonTree side) {
+        return problem(kind, protocol, side == null ? first(x) : first(side), orHead(x));
+    }
+
     private static String orHead(GTGMixed x) { return "or " + x.getOtherChild() + " -> " + x.getObserverChild(); }
 
     private static final List<String> ORDER = List.of("WF", "SD", "CT", "BA", "projection",
@@ -204,6 +210,18 @@ public final class Diagnose {
     private int first(CommonTree n) {
         int i = n.getTokenStartIndex();
         return i >= 0 && i < tokens.size() ? tokens.get(i).getLine() : n.getLine();
+    }
+
+    // A side or a branch: the line it opens on, and its messages' lines.
+    private void region(CommonTree block, Set<Integer> into) {
+        into.add(first(block));
+        messages(block, into);
+    }
+
+    private void messages(CommonTree block, Set<Integer> into) {
+        if (block instanceof GMsgTransfer m) { into.add(first(m)); return; }
+        for (int i = 0; i < block.getChildCount(); i++)
+            if (block.getChild(i) instanceof CommonTree c) messages(c, into);
     }
 
     // Lines of the messages in a block that involve any of the roles.
@@ -311,15 +329,15 @@ public final class Diagnose {
         decisionsAt(g, sd, ct, sdOut, ctOut);
         for (var e : sdOut.entrySet()) {
             X x = byId.get(e.getKey());
-            P p = mixedProblem("SD", proto, x.at);
+            P p = sideProblem("SD", proto, x.at, x.at.getRightBlockChild());
             p.text.add("on the right, `" + x.obs + "` never reaches " + names(e.getValue()));
-            involving(x.at.getRightBlockChild(), e.getValue(), p.hard);
+            region(x.at.getRightBlockChild(), p.soft);
         }
         for (var e : ctOut.entrySet()) {
             X x = byId.get(e.getKey());
-            P p = mixedProblem("CT", proto, x.at);
+            P p = sideProblem("CT", proto, x.at, x.at.getLeftBlockChild());
             p.text.add("on the left, `" + x.obs + "` never reaches " + names(e.getValue()));
-            involving(x.at.getLeftBlockChild(), e.getValue(), p.hard);
+            region(x.at.getLeftBlockChild(), p.soft);
         }
     }
 
@@ -364,21 +382,25 @@ public final class Diagnose {
         balanceAt(u, inStep ? mu : null, sides, branches);
         for (var e : sides.entrySet()) {
             X x = byId.get(e.getKey());
-            P p = mixedProblem("BA", proto, x.at);
             TreeSet<String> l = e.getValue()[0], r = e.getValue()[1];
-            if (!l.isEmpty()) p.text.add(names(l) + " only on the left");
-            if (!r.isEmpty()) p.text.add(names(r) + " only on the right");
-            involving(x.at.getLeftBlockChild(), l, p.hard);
-            involving(x.at.getRightBlockChild(), r, p.hard);
+            P p = sideProblem("BA", proto, x.at, r.isEmpty() ? x.at.getRightBlockChild()
+                                                : l.isEmpty() ? x.at.getLeftBlockChild() : null);
+            if (!l.isEmpty()) { p.text.add(names(l) + " only on the left"); region(x.at.getRightBlockChild(), p.soft); }
+            if (!r.isEmpty()) { p.text.add(names(r) + " only on the right"); region(x.at.getLeftBlockChild(), p.soft); }
         }
         for (var e : branches.entrySet()) {
-            P p = choiceProblem("BA", proto, e.getKey());
+            GChoice c = e.getKey();
+            P p = problem("BA", proto, first(c), "choice at " + c.getSubjectChild());
             for (var r : e.getValue().entrySet()) {
                 StringBuilder after = new StringBuilder();
                 for (String op : r.getValue()) after.append(after.length() > 0 ? ", " : "").append('`').append(op).append('`');
                 p.text.add("`" + r.getKey() + "` only after " + after);
+                for (GProtoBlock b : c.getBlockChildren()) {          // the branches without it
+                    Set<Integer> in = new TreeSet<>();
+                    involving(b, Set.of(r.getKey()), in);
+                    if (in.isEmpty()) region(b, p.soft);
+                }
             }
-            for (GProtoBlock b : e.getKey().getBlockChildren()) involving(b, e.getValue().keySet(), p.hard);
         }
     }
 

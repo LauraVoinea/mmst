@@ -284,11 +284,6 @@
       each(h.querySelectorAll(".sub a"), function(a){
         if (a.getAttribute("href") === page) a.setAttribute("aria-current", "page");
       });
-      var home = h.querySelector("a.home");
-      if (home && page === "index.html") {                // no link to the page you are on
-        while (home.firstChild) home.parentNode.insertBefore(home.firstChild, home);
-        home.parentNode.removeChild(home);
-      }
       var ed = h.querySelector("a[data-editor]");
       if (ed && page === "index.html") {                  // here, the button that hides and shows it (playground.js)
         var eb = document.createElement("button");

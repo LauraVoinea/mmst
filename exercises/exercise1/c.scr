@@ -1,6 +1,6 @@
 module Timeout;
 
-// BROKEN: Timeout, but on the right B sends C a2() instead of TOc().
+// BROKEN: Timeout, but on the right a2() from A to C instead of TOc() from B to C.
 // Which safety properties fail, and why? Then press Check, compare, and fix it.
 
 global protocol Timeout(role A, role B, role C) {
@@ -12,6 +12,6 @@ global protocol Timeout(role A, role B, role C) {
         a5() from C to A;
     } or A -> B {
         TOa() from B to A;
-        a2() from B to C;
+        a2() from A to C;
     }
 }

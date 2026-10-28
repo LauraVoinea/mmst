@@ -10,9 +10,43 @@
 
 # Exercise 1
 
-- title: Exercise 1: knowledge of choice
+- title: Exercise 1: safety properties
 
-Knowledge of choice: who learns which side B took, and from which message. Open [1-Timeout](./#ex=1-Timeout) and press Check: the four checks pass, and you get three local types, one per role. Read them, then answer these.
+Safety: the four checks. Open [1-Timeout](./#ex=1-Timeout) and press Check: the four checks pass. Each of the next four is Timeout broken by one change: work out which safety properties fail, and why, before you press Check, then fix it. Complete the last two.
+
+## 1-Timeout
+
+The paper's Figure 1. B observes: it goes along with A or times out.
+
+## 1-a
+
+`Timeout` without `a3()`.
+
+## 1-b
+
+`Timeout` without `TOc()`.
+
+## 1-c
+
+On the right, `a2()` from A to C instead of `TOc()` from B to C.
+
+## 1-d
+
+After `a3()`, B chooses between `a4()` and `b4()`; C answers A only after `a4()`.
+
+## 1-Retry
+
+Timeout, valid, but once. Make A, B and C start again each time B overrules, then try the two changes in its comments.
+
+## 1-DistributedLogging
+
+CT fails. Add the message that tells whoever is left out, and get all four checks to pass.
+
+# Exercise 2
+
+- title: Exercise 2: local types and projection
+
+Local types and projection: each role's part of Timeout, and who learns which side B took, from which message. Open [1-Timeout](./#ex=1-Timeout) again and press Check: below the four checks are three local types, one per role. Read them, then answer these.
 
 1. **A's type.**
 
@@ -35,51 +69,17 @@ Knowledge of choice: who learns which side B took, and from which message. Open 
    ```
 
    C decides nothing. On the left, its first message is `a2`, from A. Does `a2` tell C which side was taken? If not, what does?
-4. **[1-a](./#ex=1-a).** On the left, B now makes an ordinary choice between `a4()` and `b4()`, and C gets `a3()` either way. What fails, and why? Then press Check, compare, and fix it.
-5. **[1-b](./#ex=1-b).** The same, with B choosing between `a3()` and `b3()`, and A getting `a4()` either way. What fails, and why? Check, compare, fix.
-6. **Without `a3()`.** Suppose we delete `a3() from B to C` from Timeout. What fails, and why? It is [2-a](./#ex=2-a), in Exercise 2.
-
-## 1-Timeout
-
-The paper's Figure 1. B observes: it goes along with A or times out.
-
-## 1-a
-
-On the left, B chooses between `a4()` and `b4()`; C gets `a3()` either way.
-
-## 1-b
-
-On the left, B chooses between `a3()` and `b3()`; A gets `a4()` either way.
-
-# Exercise 2
-
-- title: Exercise 2: safety properties
-
-Safety: the four checks. Each of the first four is Timeout broken by one change: work out which safety properties fail, and why, before you press Check, then fix it. Complete the last two.
+4. **[2-a](./#ex=2-a).** On the left, B now makes an ordinary choice between `a4()` and `b4()`, and C gets `a3()` either way. What fails, and why? Then press Check, compare, and fix it.
+5. **[2-b](./#ex=2-b).** B again chooses between `a4()` and `b4()`, now after `a3()`. C gets `c4()` from B in one branch and `d4()` from A in the other. What fails, and why? Check, compare, fix.
+6. **Without `a3()`.** That is [1-a](./#ex=1-a), in Exercise 1. With C's type in front of you: what fails, and why?
 
 ## 2-a
 
-`Timeout` without `a3()`.
+On the left, B chooses between `a4()` and `b4()`; C gets `a3()` either way.
 
 ## 2-b
 
-`Timeout` without `TOc()`.
-
-## 2-c
-
-On the right, B sends C `a2()` instead of `TOc()`.
-
-## 2-d
-
-After `a3()`, B chooses between `a4()` and `b4()`; C answers A only after `a4()`.
-
-## 2-CancellableRPC
-
-CT fails. Add the messages that tell whoever is left out, and get all four checks to pass.
-
-## 2-StreamCancel
-
-Valid, but stops after one chunk. Make it recursive so Server streams until Client cancels, then try the two changes in its comments.
+After `a3()`, B chooses between `a4()` and `b4()`; C gets `c4()` from B, or `d4()` from A.
 
 # Exercise 3
 
@@ -124,15 +124,15 @@ Code generation: from the correct Timeout to its state machines, then to running
 
 Figure 1 of the paper, for Exercise 3: its EFSMs, then its Erlang.
 
+## Retry
+
+- from: Figure 1
+
+Timeout, started again after each overrule. Step 4 runs its Erlang.
+
 # More exercises
 
-WebSocketClose is valid: read its two local types. Each of the others is broken by one change: work out what fails, and why, before you press Check, then fix it.
-
-## WebSocketClose
-
-- title: WebSocket close
-
-RFC 6455's closing handshake: either endpoint may close first, or both at once. The two local types are dual.
+Each is broken by one change: work out what fails, and why, before you press Check, then fix it.
 
 ## Overrule
 
@@ -162,7 +162,7 @@ Not a mixed choice at all: an ordinary choice.
 
 # Examples
 
-Lease and Retry first: Figure 1's Timeout, filled in, in Erlang. Then the examples from `examples/scribble` in scribble-gt-scala, each with a change to try.
+Lease and WebSocketClose first, each filled in, in Erlang. Then the examples from `examples/scribble` in scribble-gt-scala, each with a change to try.
 
 ## Lease
 
@@ -174,15 +174,16 @@ Lease and Retry first: Figure 1's Timeout, filled in, in Erlang. Then the exampl
 - try: In `client.erl`, set `PAUSE_MS` above `LEASE_MS`, which is in `lockservice.erl`, and Run again.
 - result: The lease expires first: Storage is fenced, and the write is never applied.
 
-## Retry
+## WebSocketClose
 
-- from: Figure 1
-- erlang: apps/retry
-- what: Timeout, started again after each overrule. B waits for `a1` a little longer each round; A is slow in the first two.
-- mixed choice: B is the observer, in every round: it goes along if `a1` comes in time, or overrules with `TOa()` and `TOc()`, and the three start again.
-- look: Its Erlang: press Run. The `a1` and `a2` that A sends in the rounds B overrules are stale: `gen_b` and `gen_c` drop them.
-- try: In `a.erl`, set `PAUSES_MS` to `[0]` and Run again.
-- result: B goes along in the first round, and nothing is dropped.
+- title: WebSocket close
+- from: RFC 6455
+- erlang: apps/websocket
+- what: The closing handshake: Client sends a frame and Server acknowledges it, then Client closes and Server answers. Either endpoint may start the closing handshake. The two local types are dual.
+- mixed choice: Server is the observer: it may close first with `close()`, even with Client's frame on its way. Client answers with `close_ack()`.
+- look: Its Erlang: press Run. Server closes a connection that stays idle for `IDLE_MS`.
+- try: In `client.erl`, set `PAUSE_MS` above `IDLE_MS`, which is in `server.erl`, and Run again.
+- result: Server closes first. The frame Client sends after that is stale: `gen_server` purges it while Server waits for `close_ack()`.
 
 ## Calculator
 
@@ -228,16 +229,6 @@ Lease and Retry first: Figure 1's Timeout, filled in, in Erlang. Then the exampl
 - look: The comments: three acks for clear termination, `cancel_ack()` for projection onto Storage.
 - try: Delete `shutdown_ack() from API to Controller;`
 - result: **CT** fails: the Controller finishes without hearing from the API.
-
-## amqp_selective_consumer
-
-- title: AMQP selective consumer
-- from: RabbitMQ case study
-- what: From RabbitMQ's Erlang client: Consumer subscribes via Channel; Server delivers until someone cancels. The completed generated Erlang passes RabbitMQ's tests.
-- mixed choice: Any of the three may cancel: Server by an ordinary choice, Channel as observer of the outer mixed choice (while Server decides), Consumer as observer of the inner one (while a delivery is in flight).
-- look: Channel's EFSM: both mixed choices inside the loop.
-- try: Delete `process_message() from Channel to Consumer;`
-- result: Checks pass; projection onto Consumer fails: nothing tells it the Server's choice.
 
 ## SMTP
 
@@ -285,3 +276,10 @@ Figure 1 as in the artifact; `1-Timeout` is the same, with comments.
 - from: Table 1
 
 Accept, reject or resubmit a quote, in a loop. The agency may adjust the price; then the client cancels with the agency and the supplier.
+
+## amqp_selective_consumer
+
+- title: AMQP selective consumer
+- from: RabbitMQ case study
+
+From RabbitMQ's Erlang client: Consumer subscribes via Channel; Server delivers until someone cancels. Any of the three may cancel, and it has two mixed choices. The completed generated Erlang passes RabbitMQ's tests.

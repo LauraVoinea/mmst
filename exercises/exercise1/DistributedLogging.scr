@@ -1,0 +1,36 @@
+module DistributedLogging;
+
+// Fill in the example.
+// Controller starts Logs, which reports success or failure, round after round; after
+// a failure Controller restarts it or stops it. Controller observes: it may time Logs
+// out, hence "or Logs -> Controller".
+//
+// CT fails. Add the message that tells whoever is left out, and get all four checks
+// to pass.
+
+data <erlang> "integer()" from "rt.jar" as int;
+
+global protocol DistributedLogging(role Controller, role Logs) {
+    start_logging(int) from Controller to Logs;
+    rec Loop {
+        mixed {
+            choice at Logs {
+                log_success(int) from Logs to Controller;
+                continue Loop;
+            } or {
+                log_failure(int) from Logs to Controller;
+                choice at Controller {
+                    restart_logging(int) from Controller to Logs;
+                    continue Loop;
+                } or {
+                    stop_logging(int) from Controller to Logs;
+                }
+            }
+        } or Logs -> Controller {
+            timeout() from Controller to Logs;
+            ack() from Logs to Controller;
+            restart(int) from Controller to Logs;
+            continue Loop;
+        }
+    }
+}

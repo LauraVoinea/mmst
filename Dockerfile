@@ -4,7 +4,7 @@
 #   docker run --rm -p 8080:10000 mmst-playground
 
 # The checker commit the image builds.
-ARG TOOLCHAIN_COMMIT=da95a682d934b7cb974e6f4696b210d8efd68152
+ARG TOOLCHAIN_COMMIT=6c15a5ec4d214ad34a6a1fdc7701c75d95c99120
 
 # --- build ---
 FROM eclipse-temurin:21-jdk AS build
@@ -72,6 +72,7 @@ COPY exercises/exercise3/*.scr /app/exercises/exercise3/
 COPY protocols/more/*.scr /app/protocols/more/
 COPY protocols/lease/*.scr /app/protocols/lease/
 COPY protocols/retry/*.scr /app/protocols/retry/
+COPY protocols/websocket/*.scr /app/protocols/websocket/
 COPY erlang /app/erlang
 RUN mkdir -p /var/lib/mmst/runs && chmod 711 /var/lib/mmst/runs \
  && chmod 755 /app/container.sh \

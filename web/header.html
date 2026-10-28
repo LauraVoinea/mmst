@@ -1,9 +1,10 @@
 <!-- The bar at the top of every page. shared.js puts it into <header id="site-header">;
      whatever the page already has in its header (the playground's mode tabs and menus)
-     takes the place of data-slot. The current page's link gets aria-current. On the
-     playground, editor becomes the button that hides and shows the editor. -->
+     takes the place of data-slot. The current page's link gets aria-current. The brand opens
+     the playground with an empty editor; on the playground, editor becomes the button that
+     hides and shows the editor. -->
 <div class="brand">
-  <a class="home" href="./" title="Playground">
+  <a class="home" href="./?new" title="An empty editor">
     <svg width="42" height="20" viewBox="0 0 42 20" aria-hidden="true">
       <line x1="0" y1="4" x2="42" y2="4" stroke="var(--rule-2)"></line>
       <line x1="0" y1="16" x2="42" y2="16" stroke="var(--rule-2)"></line>

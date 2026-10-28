@@ -258,8 +258,9 @@
     $("modname").style.color = m || none ? "" : "var(--fail)";
   }
 
-  // Marks from the last check: hard, the lines at fault; soft, the construct. Kept
-  // while the line count stands, so they still point at the same lines.
+  // Marks from the last check: hard, the lines at fault; soft, the construct, or the side or
+  // branch where a role is missing. Kept while the line count stands, so they still point at
+  // the same lines.
   var hl = document.getElementById("hl"), marks = null;
   function lineCount(s){ return s.split("\n").length; }
   function mark(ps){
@@ -347,10 +348,15 @@
     pre.scrollTop = src.scrollTop; pre.scrollLeft = src.scrollLeft;
   });
 
-  // The draft comes back after a visit to the other pages. Opened afresh or reloaded, the
-  // editor is empty, even when the address names an example.
+  // The draft comes back after a visit to the other pages. Opened afresh or reloaded, or
+  // from the brand (?new), the editor is empty, even when the address names an example.
   var DRAFT = "mmst.draft";
-  function saveDraft(){ try { sessionStorage.setItem(DRAFT, src.value); } catch (e) {} }
+  function saveDraft(){
+    try {
+      sessionStorage.setItem(DRAFT, src.value);
+      sessionStorage.setItem(DRAFT + ".from", current ? current.id : "");    // its menu entry
+    } catch (e) {}
+  }
   function navType(){
     try { var n = performance.getEntriesByType("navigation")[0]; return n ? n.type : "navigate"; }
     catch (e) { return "navigate"; }
@@ -364,7 +370,11 @@
   }
   function loadDraft(){
     if (!returning()) return null;
-    try { return sessionStorage.getItem(DRAFT); } catch (e) { return null; }
+    try {
+      var d = sessionStorage.getItem(DRAFT), from = sessionStorage.getItem(DRAFT + ".from");
+      if (d && from) current = { id: from, edited: true };                 // settled once the menu is in
+      return d;
+    } catch (e) { return null; }
   }
   src.addEventListener("input", saveDraft);
   window.addEventListener("pagehide", saveDraft);
@@ -398,8 +408,7 @@
     modeButtons.forEach(function(b){ b.setAttribute("aria-selected", b.getAttribute("data-mode") === m ? "true" : "false"); });
     if (m === "erlang") return window.MMST.erlang.enter(want);
     if (was === "erlang") window.MMST.erlang.leave();
-    history.replaceState(null, "", $("examples").value ? "#ex=" + encodeURIComponent($("examples").value)
-                                                       : location.pathname + location.search);
+    named();
     if (!shown) idle();
   }
   modeButtons.forEach(function(b){ b.addEventListener("click", function(){ setMode(b.getAttribute("data-mode")); }); });
@@ -428,26 +437,57 @@
     sel.appendChild(rule); sel.appendChild(more);
   }
 
-  // From the menu or #ex=NAME[&view=efsm[&role=R]]; the hash names it until the first edit.
+  // The menu shows what the editor holds: its entry, or, when edited or not in the menu, a
+  // hidden option with its name. Picking an entry loads it as it was, even the one in hand.
+  var current = null, shownAs = null;                                   // current: { id, edited }
+  function lf(s){ return s.replace(/\r\n?/g, "\n"); }
+  function settle(){                                    // edited: not the protocol as it was
+    var x = current && byId[current.id];
+    if (current && !x) current = null;
+    else if (current) current.edited = lf(src.value) !== lf(x.source);
+  }
+  function syncMenu(){
+    if (!shownAs) {
+      shownAs = document.createElement("option");
+      shownAs.value = ""; shownAs.hidden = shownAs.disabled = true;
+      sel.insertBefore(shownAs, sel.options[0].nextSibling);
+    }
+    if (!current) { sel.value = ""; return; }
+    if (!current.edited) { sel.value = current.id; if (sel.value === current.id) return; }
+    shownAs.textContent = (window.MMST.examples ? window.MMST.examples.title(current.id) : current.id)
+                        + (current.edited ? ", edited" : "");
+    shownAs.selected = true;
+  }
+  // The address names the protocol until it is edited: #ex=NAME.
+  function named(){
+    var h = current && !current.edited ? "#ex=" + encodeURIComponent(current.id) : "";
+    if (location.hash !== h) history.replaceState(null, "", h || location.pathname + location.search);
+  }
+
+  // From the menu or #ex=NAME[&view=efsm[&role=R]].
   function load(id, v, role){
     var x = byId[id];
     if (!x) return false;
     src.value = x.source;
     syncName();
     mark(null);
-    sel.value = id;
-    if (sel.value !== id) sel.value = "";                 // not in the menu: show its prompt
+    current = { id: id, edited: false };
+    syncMenu();
     history.replaceState(null, "", "#ex=" + encodeURIComponent(id));
+    saveDraft();
     if (v === "efsm") showEFSMs(role); else if (VIEWS[v]) VIEWS[v](); else idle();
     return true;
   }
   sel.addEventListener("change", function(){
-    if (sel.value === MORE) { sel.value = ""; location.href = MORE; return; }
+    if (sel.value === MORE) { syncMenu(); location.href = MORE; return; }
     if (sel.value) load(sel.value);
   });
   src.addEventListener("input", function(){
-    if (sel.value) sel.value = "";
-    if (/[#&]ex=/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search);
+    if (!current) return;
+    if (!src.value.trim()) current = null; else settle();
+    syncMenu();
+    named();
+    saveDraft();
   });
 
   var menu = Promise.all([
@@ -472,13 +512,17 @@
   });
   var erl = /[#&]mode=erlang(?:&|$)/.test(hash), erlId = /[#&]erl=([^&]+)/.exec(hash);
 
-  src.value = seeded || loadDraft() || "";
+  var fresh = location.search === "?new";
+  if (fresh) history.replaceState(null, "", location.pathname + location.hash);
+  src.value = seeded || (fresh ? "" : loadDraft()) || "";
+  if (seeded || !src.value) current = null;
   syncName();
   syncHighlight();
   window.MMST.lineNumbers(src, hl);
   // Start: #mode=erlang, else #p=, else #ex= (once the menu is in) unless reloaded, else the
   // draft, else empty.
   if (ex && !erl && navType() === "reload") { ex = null; history.replaceState(null, "", location.pathname + location.search); }
+  menu.then(function(){ settle(); syncMenu(); }, function(){});
   if (erl) {
     menu["catch"](function(){});
     setMode("erlang", erlId ? unescapeHash(erlId[1]) : undefined);

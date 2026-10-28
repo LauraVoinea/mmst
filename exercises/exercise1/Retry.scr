@@ -1,0 +1,23 @@
+module Retry;
+
+// Add in recursion. Valid as it stands.
+//
+// Timeout, once. Make A, B and C start again each time B overrules, with
+// rec Name { ... continue Name; }. Keep all four checks passing.
+//
+// Then, for each change below, which safety properties fail, and why? Check and compare:
+//   1. the rec inside the left side, around its five messages only;
+//   2. a continue at the end of the left side as well.
+
+global protocol Retry(role A, role B, role C) {
+    mixed {                       // left
+        a1() from A to B;
+        a2() from A to C;
+        a3() from B to C;
+        a4() from B to A;
+        a5() from C to A;
+    } or A -> B {                 // right: B overrules A
+        TOa() from B to A;
+        TOc() from B to C;
+    }
+}

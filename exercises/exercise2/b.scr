@@ -1,16 +1,24 @@
 module Timeout;
 
-// BROKEN: Timeout without TOc() from B to C.
-// Which safety properties fail, and why? Then press Check, compare, and fix it.
+// BROKEN: Timeout, with B choosing between a4() and b4() after a3(); C gets c4() from
+// B in one branch and d4() from A in the other.
+// What fails, and why? Then press Check, compare, and fix it.
 
 global protocol Timeout(role A, role B, role C) {
     mixed {
         a1() from A to B;
         a2() from A to C;
         a3() from B to C;
-        a4() from B to A;
-        a5() from C to A;
+        choice at B {
+            a4() from B to A;
+            c4() from B to C;
+            a5() from C to A;
+        } or {
+            b4() from B to A;
+            d4() from A to C;
+        }
     } or A -> B {
         TOa() from B to A;
+        TOc() from B to C;
     }
 }

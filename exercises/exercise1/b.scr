@@ -1,23 +1,16 @@
 module Timeout;
 
-// BROKEN: Timeout, with B choosing between a3() and b3() on the left; A gets a4()
-// either way.
-// What fails, and why? Then press Check, compare, and fix it.
+// BROKEN: Timeout without TOc() from B to C.
+// Which safety properties fail, and why? Then press Check, compare, and fix it.
 
 global protocol Timeout(role A, role B, role C) {
     mixed {
         a1() from A to B;
         a2() from A to C;
-        choice at B {
-            a3() from B to C;
-            a4() from B to A;
-            a5() from C to A;
-        } or {
-            b3() from B to C;
-            a4() from B to A;
-        }
+        a3() from B to C;
+        a4() from B to A;
+        a5() from C to A;
     } or A -> B {
         TOa() from B to A;
-        TOc() from B to C;
     }
 }
