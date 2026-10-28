@@ -196,6 +196,16 @@
     draw();
   };
 
+  // Text an editor puts in for a key, Tab's four spaces: inserted as typing is, so the
+  // browser's undo takes it back and the input listeners hear it.
+  MMST.insertText = function(ta, text){
+    var done = false;
+    try { done = document.execCommand("insertText", false, text); } catch (e) {}
+    if (done) return;
+    ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, "end");
+    ta.dispatchEvent(new Event("input"));
+  };
+
   function each(list, f){ Array.prototype.forEach.call(list, f); }
 
   MMST.text = function(url){

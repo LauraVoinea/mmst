@@ -1,0 +1,22 @@
+module SipCancel;
+
+// SIP (RFC 3261): Caller calls, and may cancel while it rings. The Erlang mode's sip set
+// runs it.
+// Callee observes: it goes along with the CANCEL (left), or answers first (right), even
+// with the CANCEL on its way. RFC 5407 shows that crossing, in section 3.1.2.
+
+global protocol SipCancel(role Caller, role Callee) {
+    invite() from Caller to Callee;           // INVITE
+    ringing() from Callee to Caller;          // 180 Ringing
+    mixed {                                   // left: Caller cancels
+        cancel() from Caller to Callee;       // CANCEL
+        cancel_ok() from Callee to Caller;    // 200 OK for the CANCEL
+        terminated() from Callee to Caller;   // 487 Request Terminated, for the INVITE
+        ack() from Caller to Callee;          // ACK
+    } or Caller -> Callee {                   // right: Callee answers first
+        invite_ok() from Callee to Caller;    // 200 OK for the INVITE
+        ack() from Caller to Callee;          // ACK
+        bye() from Caller to Callee;          // BYE: Caller hangs up
+        bye_ok() from Callee to Caller;       // 200 OK for the BYE
+    }
+}

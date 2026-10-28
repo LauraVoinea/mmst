@@ -382,10 +382,7 @@
   src.addEventListener("keydown", function(e){
     if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
-      src.setRangeText("    ", src.selectionStart, src.selectionEnd, "end");
-      syncName();
-      keepMarks();
-      syncHighlight();
+      window.MMST.insertText(src, "    ");
     }
   });
   document.addEventListener("keydown", function(e){

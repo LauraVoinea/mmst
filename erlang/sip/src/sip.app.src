@@ -1,0 +1,9 @@
+{application, sip,
+ [{description, "A SIP call, cancelled as it rings"},
+  {vsn, "0.1.0"},
+  {registered, [caller, callee]},
+  {mod, {sip_app, []}},
+  {applications, [kernel, stdlib]},
+  {env, []},
+  {modules, []}
+ ]}.

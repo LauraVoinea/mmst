@@ -567,8 +567,7 @@
       ta.addEventListener("keydown", function(e){
         if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) {
           e.preventDefault();
-          ta.setRangeText("    ", ta.selectionStart, ta.selectionEnd, "end");
-          onInput();
+          window.MMST.insertText(ta, "    ");
         }
       });
       chips.addEventListener("click", function(e){

@@ -42,6 +42,7 @@ The classpath is cached in `.classpath`. Erlang runs need `erl` and `erlc` on th
 | `protocols/lease`, `erlang/lease` | Lease, Figure 1's Timeout as a lease, and its Erlang, filled in |
 | `protocols/retry`, `erlang/retry` | Retry, Figure 1's Timeout started again after each overrule, and its Erlang, filled in |
 | `protocols/websocket`, `erlang/websocket` | WebSocketClose, RFC 6455's closing handshake, and its Erlang, filled in |
+| `protocols/sip`, `erlang/sip` | SipCancel, a SIP call cancelled while it rings, RFC 3261, and its Erlang, filled in |
 
 ## API
 
@@ -61,8 +62,8 @@ heap cap. Responses are cached by protocol text. `-gt-check-fidelity` and
 
 ## Erlang mode
 
-Sets: this repository's `erlang/lease`, `erlang/retry` and `erlang/websocket`, the artifact's
-filled-in apps (`examples/erlang`), whatever `./mMST.sh` wrote to `generated/`, and modules
+Sets: this repository's `erlang/lease`, `erlang/retry`, `erlang/websocket` and `erlang/sip`, the
+artifact's filled-in apps (`examples/erlang`), whatever `./mMST.sh` wrote to `generated/`, and modules
 generated from the editor. Edits are kept per set for the session; `.zip` downloads them.
 
 **Run** compiles every module in a fresh VM, `gen_` modules first, starts the roles from the

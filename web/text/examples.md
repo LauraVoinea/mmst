@@ -162,7 +162,7 @@ Not a mixed choice at all: an ordinary choice.
 
 # Examples
 
-Lease and WebSocketClose first, each filled in, in Erlang. Then the examples from `examples/scribble` in scribble-gt-scala, each with a change to try.
+Lease, WebSocketClose and SipCancel first, each filled in, in Erlang. Then the examples from `examples/scribble` in scribble-gt-scala, each with a change to try.
 
 ## Lease
 
@@ -184,6 +184,17 @@ Lease and WebSocketClose first, each filled in, in Erlang. Then the examples fro
 - look: Its Erlang: press Run. Server closes a connection that stays idle for `IDLE_MS`.
 - try: In `client.erl`, set `PAUSE_MS` above `IDLE_MS`, which is in `server.erl`, and Run again.
 - result: Server closes first. The frame Client sends after that is stale: `gen_server` purges it while Server waits for `close_ack()`.
+
+## SipCancel
+
+- title: SIP cancel
+- from: RFC 3261
+- erlang: apps/sip
+- what: A phone call being set up. Caller sends `invite()`, Callee rings and answers with `invite_ok()`, Caller acknowledges with `ack()` and later hangs up with `bye()`. While it rings, Caller may cancel: then Callee ends the call with `terminated()`, SIP's 487.
+- mixed choice: Callee is the observer: it goes along with Caller's `cancel()`, or answers first, even with the `cancel()` on its way. RFC 5407 shows that crossing, in section 3.1.2.
+- look: Its Erlang: press Run. Callee answers after `ANSWER_MS`, before Caller cancels after `RING_MS`.
+- try: In `callee.erl`, set `ANSWER_MS` to 1000, the same as `RING_MS`, which is in `caller.erl`, and Run again.
+- result: Callee answers as Caller cancels, and the two messages cross. Caller gets `invite_ok()` after its `cancel()`: it acknowledges, then hangs up at once. The `cancel()` is stale: `gen_callee` purges it.
 
 ## Calculator
 

@@ -73,6 +73,7 @@ COPY protocols/more/*.scr /app/protocols/more/
 COPY protocols/lease/*.scr /app/protocols/lease/
 COPY protocols/retry/*.scr /app/protocols/retry/
 COPY protocols/websocket/*.scr /app/protocols/websocket/
+COPY protocols/sip/*.scr /app/protocols/sip/
 COPY erlang /app/erlang
 RUN mkdir -p /var/lib/mmst/runs && chmod 711 /var/lib/mmst/runs \
  && chmod 755 /app/container.sh \

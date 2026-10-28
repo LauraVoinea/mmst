@@ -146,12 +146,13 @@ public final class Playground {
 
     private static final Pattern EXERCISE_DIR = Pattern.compile("exercise(\\d{1,3})");
 
-    // More groups: a folder in protocols/, and the group's name. Lease and WebSocketClose join the
-    // checker's examples; Retry joins Exercise 3.
+    // More groups: a folder in protocols/, and the group's name. Lease, WebSocketClose and
+    // SipCancel join the checker's examples; Retry joins Exercise 3.
     private static final String[][] GROUPS = {
         { "more", "More exercises" },
         { "lease", "Examples" },
         { "websocket", "Examples" },
+        { "sip", "Examples" },
         { "retry", "Exercise 3" },
     };
 
