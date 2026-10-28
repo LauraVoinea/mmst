@@ -1,0 +1,9 @@
+{application, websocket,
+ [{description, "RFC 6455's closing handshake"},
+  {vsn, "0.1.0"},
+  {registered, [client, server]},
+  {mod, {websocket_app, []}},
+  {applications, [kernel, stdlib]},
+  {env, []},
+  {modules, []}
+ ]}.

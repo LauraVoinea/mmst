@@ -1,0 +1,18 @@
+module WebSocketClose;
+
+// RFC 6455 (WebSocket): either endpoint may start the closing handshake; the Erlang
+// mode's websocket set runs it.
+// Client sends a frame, then closes. Server observes: it goes along with Client (left),
+// or closes first (right), even with Client's frame on its way.
+
+global protocol WebSocketClose(role Client, role Server) {
+    mixed {                        // left: Client sends, then closes
+        frame() from Client to Server;
+        ack() from Server to Client;
+        close() from Client to Server;
+        close_ack() from Server to Client;
+    } or Client -> Server {        // right: Server overrules Client
+        close() from Server to Client;
+        close_ack() from Client to Server;
+    }
+}
