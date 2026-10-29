@@ -18,8 +18,10 @@ if [ -z "$cpu" ]; then
   if [ "$q" -gt 0 ]; then cpu=$((100 * q / p)); else cpu=100; fi
 fi
 
-if [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 1500 ]; then      # 512 MB
+if [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 1000 ]; then      # 512 MB
   heap=160m checker=192m slots=1 eslots=1 emem=384
+elif [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 1500 ]; then    # a Linode 2 GB: 1.3 GB, one CPU
+  heap=192m checker=192m slots=2 eslots=2 emem=384           # a check ~80 MB, a run ~60 MB
 elif [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt 3500 ]; then    # 2 GB
   heap=384m checker=256m slots=2 eslots=2 emem=640
 else

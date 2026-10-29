@@ -110,6 +110,7 @@
         status("");
         if (r.ok && r.files && r.files.length) return openGenerated(module, r.files);
         sel.value = set ? set.id : "";
+        if (r.code === "busy") return message("wait", "Busy", r.error);
         message("", "Not generated", (r.error || "Invalid protocol.") + " Check it in Protocol mode.");
       })
       .catch(function(e){ status(""); offline(e); });

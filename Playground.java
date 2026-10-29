@@ -50,7 +50,15 @@ public final class Playground {
             @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, String> e) { return size() > 512; }
         };
 
-    private static String cached(String key) { synchronized (CACHE) { return CACHE.get(key); } }
+    // The menu's protocols, worked out at start-up (prewarm) and never evicted.
+    private static final java.util.concurrent.ConcurrentHashMap<String, String> PINNED =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static String cached(String key) {
+        String pinned = PINNED.get(key);
+        if (pinned != null) return pinned;
+        synchronized (CACHE) { return CACHE.get(key); }
+    }
     // Not timeouts: the server may only have been busy.
     private static String cache(String key, String value) {
         if (value != null && (!value.contains("\"stage\":\"error\"") || value.contains("\"code\":"))
@@ -59,10 +67,22 @@ public final class Playground {
         return value;
     }
 
-    // Concurrent checker JVMs.
+    // Concurrent checker JVMs, given out in the order asked for.
     private static final java.util.concurrent.Semaphore SLOTS =
         new java.util.concurrent.Semaphore(
-            Integer.getInteger("mmst.slots", Math.max(2, Math.min(6, Runtime.getRuntime().availableProcessors()))));
+            Integer.getInteger("mmst.slots", Math.max(2, Math.min(6, Runtime.getRuntime().availableProcessors()))), true);
+
+    // How long a request waits for a checker or a run to come free before the server says busy.
+    private static final long SLOT_WAIT_MS = Long.getLong("mmst.slot.wait", 60_000);
+
+    // No checker came free in time: the server is busy, and the protocol is not at fault.
+    private static final class Busy extends Exception {
+        Busy() { super(null, null, false, false); }
+    }
+
+    // Answers being worked out: the same request from several people at once is worked out once.
+    private static final java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.CompletableFuture<String>> RUNNING =
+        new java.util.concurrent.ConcurrentHashMap<>();
 
     private static final Pattern MODULE   = Pattern.compile("(?m)^\\s*module\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;");
     private static final Pattern PROTOCOL = Pattern.compile("(?m)^\\s*global\\s+protocol\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*[(<]");
@@ -99,11 +119,16 @@ public final class Playground {
         server.createContext("/api/erlang/run",   Playground::erlangRun);
         server.createContext("/api/health",   ex -> send(ex, 200, "application/json", "{\"ok\":true}"));
         server.createContext("/", Playground::statics);
-        server.setExecutor(Executors.newFixedThreadPool(16));   // a run holds its thread for up to ~30 s
+        // A request waiting for a checker or a run holds its thread: enough threads for a room's
+        // Checks to queue while pages still load.
+        server.setExecutor(Executors.newFixedThreadPool(64));
         server.start();
 
         try { validate("module Warmup;\nglobal protocol Warmup(role A, role B) { x() from A to B; }"); }
         catch (Throwable ignored) { }
+        Thread warm = new Thread(Playground::prewarm, "mmst-prewarm");
+        warm.setDaemon(true);
+        warm.start();
 
         System.out.println("playground  http://localhost:" + port + "  web " + webroot);
         System.out.println("  exercises " + (isDir(exercises) ? exercises : "none (-Dmmst.exercises)"));
@@ -134,26 +159,78 @@ public final class Playground {
         }
         if (!source.endsWith("\n")) source += "\n";   // the grammar needs a newline after a trailing // comment
 
-        String key = ex.getHttpContext().getPath() + "\u0000" + source;
-        String hit = cached(key);
-        if (hit != null) { send(ex, 200, "application/json", hit); return; }
+        send(ex, 200, "application/json", answer(ex.getHttpContext().getPath(), fn, source));
+    }
 
-        String out;
+    // From the cache, from a request for the same that is under way, or worked out now.
+    private static String answer(String path, Endpoint fn, String source) {
+        String key = path + "\u0000" + source;
+        String hit = cached(key);
+        if (hit != null) return hit;
+        java.util.concurrent.CompletableFuture<String> mine = new java.util.concurrent.CompletableFuture<>();
+        java.util.concurrent.CompletableFuture<String> theirs = RUNNING.putIfAbsent(key, mine);
+        if (theirs != null) return theirs.join();
+
+        String out = err("Checker failed.");
         try { out = cache(key, fn.apply(source)); }
+        catch (Busy b) { out = err("The server is busy. Try again in a moment.", "busy", null); }
         catch (Exception e) { out = err("Checker failed: " + safe(String.valueOf(e.getMessage()))); }
-        send(ex, 200, "application/json", out);
+        finally { mine.complete(out); RUNNING.remove(key, mine); }
+        return out;
+    }
+
+    // Every protocol of the menu and the examples page, checked, with its EFSMs and its Erlang,
+    // one at a time, so that a room's first clicks on them are answered at once.
+    private static void prewarm() {
+        long t = System.nanoTime();
+        int n = 0;
+        for (Path p : menuProtocols()) {
+            String source;
+            try { source = Files.readString(p, StandardCharsets.UTF_8); }
+            catch (IOException | RuntimeException e) { continue; }
+            if (!source.endsWith("\n")) source += "\n";
+            n += pin("/api/validate", Playground::validate, source)
+               + pin("/api/efsm", Playground::efsm, source)
+               + pin("/api/generate", Playground::generate, source);
+        }
+        System.out.println("  prewarm   " + n + " answers in " + (System.nanoTime() - t) / 1_000_000_000 + " s");
+    }
+
+    private static int pin(String path, Endpoint fn, String source) {
+        String out = answer(path, fn, source);
+        if (cached(path + "\u0000" + source) == null) return 0;          // busy or timed out: not kept
+        PINNED.put(path + "\u0000" + source, out);
+        return 1;
+    }
+
+    // The protocols behind /api/examples, the exercises first.
+    private static List<Path> menuProtocols() {
+        List<Path> all = new ArrayList<>();
+        try {
+            if (isDir(exercises))
+                try (Stream<Path> s = Files.list(exercises)) {
+                    for (Path d : s.filter(p -> EXERCISE_DIR.matcher(p.getFileName().toString()).matches() && Files.isDirectory(p))
+                                   .sorted(Comparator.comparingInt(Playground::exerciseNumber)).toList())
+                        all.addAll(protocols(d));
+                }
+            if (isDir(groupRoot))
+                for (String[] g : GROUPS)
+                    if (isDir(groupRoot.resolve(g[0]))) all.addAll(protocols(groupRoot.resolve(g[0])));
+            if (isDir(artifactExamples)) all.addAll(protocols(artifactExamples));
+        } catch (IOException e) { }
+        return all;
     }
 
     private static final Pattern EXERCISE_DIR = Pattern.compile("exercise(\\d{1,3})");
 
     // More groups: a folder in protocols/, and the group's name. Lease, WebSocketClose and
-    // SipCancel join the checker's examples; Retry joins Exercise 3.
+    // SipCancel join the checker's examples; Retry joins Exercise 4.
     private static final String[][] GROUPS = {
         { "more", "More exercises" },
         { "lease", "Examples" },
         { "websocket", "Examples" },
         { "sip", "Examples" },
-        { "retry", "Exercise 3" },
+        { "retry", "Exercise 4" },
     };
 
     // Menu: each exerciseN/ folder, the GROUPS folders, then examples/scribble.
@@ -312,8 +389,8 @@ public final class Playground {
 
     // argv[0] is the protocol file; Diagnose writes problems.json beside it.
     private static Run runTool(String[] argv) throws Exception {
-        if (!SLOTS.tryAcquire(20, TimeUnit.SECONDS))
-            return new Run("", 1, true, null);
+        if (!SLOTS.tryAcquire(SLOT_WAIT_MS, TimeUnit.MILLISECONDS))
+            throw new Busy();
         Path problems = Paths.get(argv[0]).resolveSibling("problems.json");
         try {
             List<String> cmd = new ArrayList<>(List.of(
@@ -570,7 +647,7 @@ public final class Playground {
 
     // Concurrent runs.
     private static final java.util.concurrent.Semaphore ERL_SLOTS =
-        new java.util.concurrent.Semaphore(Integer.getInteger("mmst.erlang.slots", 2));
+        new java.util.concurrent.Semaphore(Integer.getInteger("mmst.erlang.slots", 2), true);
 
     private static Path   erlExamples, erlGenerated, erlApps;
     private static String erl;                    // null when runs are off
@@ -975,7 +1052,7 @@ public final class Playground {
         if (bytes > ERL_MAX_BYTES) return err("Over 1 MB.");
         int seconds = req.get("seconds") instanceof Number n ? Math.max(1, Math.min(ERL_SECONDS, n.intValue())) : ERL_SECONDS;
 
-        if (!ERL_SLOTS.tryAcquire(15, TimeUnit.SECONDS))
+        if (!ERL_SLOTS.tryAcquire(SLOT_WAIT_MS, TimeUnit.MILLISECONDS))
             return "{\"ok\":false,\"stage\":\"busy\",\"error\":" + jsonStr("Busy. Try again in a few seconds.") + "}";
         Integer uid = RUN_UIDS.poll();                   // null unless runs get their own user
         Path dir = null;

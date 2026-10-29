@@ -69,6 +69,7 @@ COPY mmst_run.erl container.sh /app/
 COPY exercises/exercise1/*.scr /app/exercises/exercise1/
 COPY exercises/exercise2/*.scr /app/exercises/exercise2/
 COPY exercises/exercise3/*.scr /app/exercises/exercise3/
+COPY exercises/exercise4/*.scr /app/exercises/exercise4/
 COPY protocols/more/*.scr /app/protocols/more/
 COPY protocols/lease/*.scr /app/protocols/lease/
 COPY protocols/retry/*.scr /app/protocols/retry/

@@ -36,7 +36,7 @@ The classpath is cached in `.classpath`. Erlang runs need `erl` and `erlc` on th
 | `mmst_run.erl` | compiles and runs a set of modules in a fresh VM; reports each role |
 | `serve.sh`, `classpath.sh` | build and run locally |
 | `Dockerfile`, `container.sh`, `nonet.c` | the container image |
-| `deploy/` | a server of your own: the setup for Ubuntu 24.04, the service, `mmst-update` |
+| `deploy/` | a server of your own: the setup for Ubuntu 24.04, the service, `mmst-update`, a load test |
 | `exercises/` | the exercises in the menu |
 | `protocols/more` | more exercises, on the examples page |
 | `protocols/lease`, `erlang/lease` | Lease, Figure 1's Timeout as a lease, and its Erlang, filled in |
@@ -57,8 +57,11 @@ The classpath is cached in `.classpath`. Erlang runs need `erl` and `erlc` on th
 | `GET /api/health` | `{"ok":true}` |
 
 Each check runs in a child JVM, since the checker exits on parse errors, with a deadline and a
-heap cap. Responses are cached by protocol text. `-gt-check-fidelity` and
-`-gt-check-completeness` are not exposed.
+heap cap. Responses are cached by protocol text, and the same request from several people at
+once is worked out once. At start-up the server works out every protocol of the menu and the
+examples page, checked, with its EFSMs and its Erlang, and keeps those answers. A request waits
+up to a minute for a checker; after that the answer is that the server is busy.
+`-gt-check-fidelity` and `-gt-check-completeness` are not exposed.
 
 ## Erlang mode
 
@@ -93,12 +96,15 @@ docker run --rm -p 8080:10000 mmst-playground     # http://localhost:8080
 The image builds the checker at `TOOLCHAIN_COMMIT`, without sbt, adds
 Erlang/OTP 27, and runs with `MMST_ERLANG=all`. `container.sh` sizes it to the container:
 
-| Variable | | 512 MB | 2 GB | more |
-|---|---|---|---|---|
-| `MMST_SLOTS` | checks at once | 1 | 2 | 4 |
-| `MMST_ERLANG_SLOTS` | runs at once | 1 | 2 | 3 |
-| `MMST_ERLANG_MEMORY` | MB per run | 384 | 640 | 768 |
-| `MMST_HEAP`, `MMST_CHECKER_HEAP` | server, check heap | 160m, 192m | 384m, 256m | 512m, 256m |
+| Variable | | 512 MB | Linode 2 GB | 2 GB | more |
+|---|---|---|---|---|---|
+| `MMST_SLOTS` | checks at once | 1 | 2 | 2 | 4 |
+| `MMST_ERLANG_SLOTS` | runs at once | 1 | 2 | 2 | 3 |
+| `MMST_ERLANG_MEMORY` | MB per run | 384 | 384 | 640 | 768 |
+| `MMST_HEAP`, `MMST_CHECKER_HEAP` | server, check heap | 160m, 192m | 192m, 192m | 384m, 256m | 512m, 256m |
+
+A Linode 2 GB gives the container about 1.3 GB. A check takes about 80 MB and half a second
+of CPU; a run, about 60 MB and little CPU, since the examples mostly wait.
 
 `MMST_DEADLINE`: ms per check, 15000, or 90000 below half a CPU. `MMST_ERLANG=off` switches runs
 off. `serve.sh` reads `MMST_SLOTS` and `MMST_ERLANG_SLOTS`.
@@ -135,10 +141,20 @@ the hostname.
 | `/opt/mmst/env` | the container's variables, one `NAME=value` a line, read at each restart; `MMST_ERLANG=off` stops runs |
 
 The container gets the machine's memory less 640 MB, and `container.sh` sizes the playground
-to that: on a Linode 2 GB, one check and one run at once. For a busy day, a workshop say, resize the Linode
-the day before to Dedicated CPU, Dedicated 8 GB: four checks and three runs at once, about
-$0.11 an hour. Untick *Auto Resize Disk*, so that it can go back to Linode 2 GB afterwards. A
-resize reboots the Linode, and the playground starts again at the new size.
+to that: on a Linode 2 GB, two checks and two runs at once. Its one CPU is what limits it. On
+one CPU of the machine it was tried on, 30 pairs pressing Check every half minute got their
+answers in about a second, 60 pairs in about four.
+
+Before a busy day, a workshop say, try it from your own machine:
+
+```sh
+python3 deploy/load-test.py https://play.example.org 30 2 --burst
+```
+
+30 pairs for 2 minutes, all pressing Check at once to start with. If its answers are slow,
+resize the Linode the day before: a Linode 4 GB has two CPUs. Untick *Auto Resize Disk*, so
+that it can go back to Linode 2 GB afterwards. A resize reboots the Linode, and the playground
+starts again at the new size.
 
 No certificate: check that the hostname points at the Linode, and that a Cloud Firewall, if
 the Linode has one, lets in ports 80 and 443; then `systemctl restart caddy`.

@@ -1,20 +1,12 @@
 module Timeout;
 
-// BROKEN: Timeout, with B choosing between a4() and b4() after a3(); C answers A
-// only after a4().
+// BROKEN: Timeout, with C only on the right: on the left, just a1() and a4().
 // Which safety properties fail, and why? Then press Check, compare, and fix it.
 
 global protocol Timeout(role A, role B, role C) {
     mixed {
         a1() from A to B;
-        a2() from A to C;
-        a3() from B to C;
-        choice at B {
-            a4() from B to A;
-            a5() from C to A;
-        } or {
-            b4() from B to A;
-        }
+        a4() from B to A;
     } or A -> B {
         TOa() from B to A;
         TOc() from B to C;

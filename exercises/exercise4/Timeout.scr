@@ -1,6 +1,6 @@
 module Timeout;
 
-// Exercise 3: from the correct Timeout to its state machines and its Erlang.
+// Exercise 4: from the correct Timeout to its state machines and its Erlang.
 // Open the EFSM tab and pick B. Click a transition: its action lights up in B's
 // local type, and its code shows below the diagram.
 // B observes: it goes along with A (left) or times out (right).

@@ -12,7 +12,7 @@
 
 - title: Exercise 1: safety properties
 
-Safety: the four checks. Open [1-Timeout](./#ex=1-Timeout) and press Check: the four checks pass. Each of the next four is Timeout broken by one change: work out which safety properties fail, and why, before you press Check, then fix it. Complete the last two.
+Safety: the four checks. Open [1-Timeout](./#ex=1-Timeout) and press Check: the four checks pass. Each of the next four is Timeout broken by one change: work out which safety properties fail, and why, before you press Check, then fix it.
 
 ## 1-Timeout
 
@@ -32,15 +32,7 @@ On the right, `a2()` from A to C instead of `TOc()` from B to C.
 
 ## 1-d
 
-After `a3()`, B chooses between `a4()` and `b4()`; C answers A only after `a4()`.
-
-## 1-Retry
-
-Timeout, valid, but once. Make A, B and C start again each time B overrules, then try the two changes in its comments.
-
-## 1-DistributedLogging
-
-CT fails. Add the message that tells whoever is left out, and get all four checks to pass.
+`Timeout` with C only on the right: on the left, just `a1()` and `a4()`.
 
 # Exercise 2
 
@@ -83,11 +75,25 @@ After `a3()`, B chooses between `a4()` and `b4()`; C gets `c4()` from B, or `d4(
 
 # Exercise 3
 
-- title: Exercise 3: code generation
+- title: Exercise 3: recursion
+
+Recursion: protocols that loop, with `rec` and `continue`.
+
+## 3-Retry
+
+Timeout, valid, but once. Make A, B and C start again each time B overrules, then try the two changes in its comments.
+
+## 3-DistributedLogging
+
+CT fails. Add the message that tells whoever is left out, and get all four checks to pass.
+
+# Exercise 4
+
+- title: Exercise 4: code generation
 
 Code generation: from the correct Timeout to its state machines, then to running Erlang. Each step opens in the playground.
 
-1. **The EFSM.** Open [B's EFSM](./#ex=3-Timeout&view=efsm&role=B). Click a transition: its action lights up in B's local type, above the diagram.
+1. **The EFSM.** Open [B's EFSM](./#ex=4-Timeout&view=efsm&role=B). Click a transition: its action lights up in B's local type, above the diagram.
    - State 5, marked `▷1`, is where the mixed choice starts. `*` marks the switch to the right, and `internal` is B's own decision.
    - Which of B's transitions commit it to a side?
    - Now pick C. Which of its transitions commit it? Does `A?a2()`?
@@ -104,7 +110,7 @@ Code generation: from the correct Timeout to its state machines, then to running
    - `message_status(Path, …)`: every message carries the path of sides its sender was on. If the receiver has already committed to another side, the message is stale, and dropped: §4.1 of the paper, and `stale/1` at the bottom of the file;
    - `commit_if_taken/3`, where B commits to a side;
    - `postpone`: a message the state cannot take yet is put back, for a later state.
-3. **Run it.** Open [the generated Erlang](./#ex=3-Timeout&view=erlang), then Edit and run, and Run: the three roles run to the end. As generated, B's callback overrules at once, so you see the right side.
+3. **Run it.** Open [the generated Erlang](./#ex=4-Timeout&view=erlang), then Edit and run, and Run: the three roles run to the end. As generated, B's callback overrules at once, so you see the right side.
 4. **Stale message purging.** Open [Retry's Erlang](./#mode=erlang&erl=apps/retry) and Run. Retry is Timeout started again after each overrule, and B overrules twice. The `a1` and `a2` that A sends in those rounds are on the left, and arrive after B and C took the right: they are stale, and the output shows `Purging stale event` for each. Turn on trace to see the sides they carry, one per round. `PAUSES_MS`, in `a.erl`, sets how long A takes in each round: try others and Run again.
 
    <div class="sides-nocommit" data-start="rhs" data-include="parts/two-runs.html"></div>
@@ -120,9 +126,9 @@ Code generation: from the correct Timeout to its state machines, then to running
 
    Run it. Then in `client.erl` set `PAUSE_MS` above `LEASE_MS`, which is in `lockservice.erl`, say to 1500, and Run again. The lease expires before the renewal comes, so LockService fences Storage, and nobody applies the write Client sends after that: Storage never applies a write made under an expired lease. Compare `storage.erl` with C's template, `c.erl`: the same states, `s4` to `s6`, filled in.
 
-## 3-Timeout
+## 4-Timeout
 
-Figure 1 of the paper, for Exercise 3: its EFSMs, then its Erlang.
+Figure 1 of the paper, for Exercise 4: its EFSMs, then its Erlang.
 
 ## Retry
 

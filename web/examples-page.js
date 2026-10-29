@@ -64,7 +64,7 @@
     window.MMST.code($("groups"));                    // the introductions' ```local, `▷` and the like
     Array.prototype.forEach.call($("groups").querySelectorAll(".intro pre"), function(p){ p.classList.add("code"); });
     $("jump").innerHTML = nav.join("");
-    // HTML parts in the introductions (Exercise 3's two runs), then the anchor: its lookup
+    // HTML parts in the introductions (Exercise 4's two runs), then the anchor: its lookup
     // ran before the content, so scroll again.
     function settle(){
       if (window.MMST.sides) window.MMST.sides($("groups"));

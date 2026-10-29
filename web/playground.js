@@ -64,7 +64,7 @@
     parse: "Syntax error", scribble: "Scribble error", projection: "Projection fails",
     "inconsistent-choice": "Inconsistent choice", "mixed-roles": "Cannot translate",
     "after-mixed": "Cannot translate", "mixed-first": "Cannot translate", "empty-block": "Cannot translate",
-    timeout: "Timed out"
+    timeout: "Timed out", busy: "Busy"
   };
 
   // With these, the problem lines say all the error would.
@@ -434,26 +434,56 @@
     sel.appendChild(rule); sel.appendChild(more);
   }
 
-  // The menu shows what the editor holds: its entry, or, when edited or not in the menu, a
-  // hidden option with its name. Picking an entry loads it as it was, even the one in hand.
-  var current = null, shownAs = null;                                   // current: { id, edited }
+  // The menu shows what the editor holds: its entry, or its edited entry, or, for a protocol the
+  // menu does not list, an entry of its own at the top. A protocol's edits are kept for the
+  // session, through other picks and reloads: its edited entry, after its own, brings them
+  // back. Picking an entry loads it as it was, even the one in hand.
+  var current = null, EDITS = "mmst.edits", edits = readEdits(), drawn = null;   // current: { id, edited }
+  function readEdits(){
+    try { var e = JSON.parse(sessionStorage.getItem(EDITS) || "{}"); return e && typeof e === "object" ? e : {}; }
+    catch (x) { return {}; }
+  }
+  function keepEdit(){                                  // the protocol in hand's edits, or none
+    if (!current) return;
+    if (current.edited) edits[current.id] = src.value; else delete edits[current.id];
+    try { sessionStorage.setItem(EDITS, JSON.stringify(edits)); } catch (x) {}
+  }
   function lf(s){ return s.replace(/\r\n?/g, "\n"); }
   function settle(){                                    // edited: not the protocol as it was
     var x = current && byId[current.id];
     if (current && !x) current = null;
     else if (current) current.edited = lf(src.value) !== lf(x.source);
   }
+  function title(id){ return window.MMST.examples ? window.MMST.examples.title(id) : id; }
+  function entry(id){                                   // its own option in the menu, if listed
+    for (var i = 0; i < sel.options.length; i++)
+      if (sel.options[i].value === id && !sel.options[i].classList.contains("kept")) return sel.options[i];
+    return null;
+  }
   function syncMenu(){
-    if (!shownAs) {
-      shownAs = document.createElement("option");
-      shownAs.value = ""; shownAs.hidden = shownAs.disabled = true;
-      sel.insertBefore(shownAs, sel.options[0].nextSibling);
+    if (current && current.edited && edits[current.id] !== src.value) keepEdit();
+    var ids = Object.keys(edits).filter(function(id){ return byId[id]; }).sort();
+    var other = current && !current.edited && !entry(current.id) ? current.id : null;
+    var key = ids.join("\n") + "\n\n" + (other || "");
+    if (key !== drawn) {                                // the kept and the unlisted entries, again
+      drawn = key;
+      Array.prototype.slice.call(sel.querySelectorAll("option.kept")).forEach(function(o){ o.remove(); });
+      var top = sel.options[0];                         // the prompt; unlisted ones go after it
+      if (other) top = kept("shown:" + other, title(other), top);
+      ids.forEach(function(id){
+        var own = entry(id);
+        if (own) kept("edited:" + id, title(id) + ", edited", own);
+        else top = kept("edited:" + id, title(id) + ", edited", top);
+      });
     }
-    if (!current) { sel.value = ""; return; }
-    if (!current.edited) { sel.value = current.id; if (sel.value === current.id) return; }
-    shownAs.textContent = (window.MMST.examples ? window.MMST.examples.title(current.id) : current.id)
-                        + (current.edited ? ", edited" : "");
-    shownAs.selected = true;
+    sel.value = !current ? "" : current.edited ? "edited:" + current.id
+              : other ? "shown:" + current.id : current.id;
+  }
+  function kept(value, text, after){                    // an entry of the menu's own, after another
+    var o = document.createElement("option");
+    o.value = value; o.textContent = text; o.className = "kept";
+    after.parentNode.insertBefore(o, after.nextSibling);
+    return o;
   }
   // The address names the protocol until it is edited: #ex=NAME.
   function named(){
@@ -475,13 +505,30 @@
     if (v === "efsm") showEFSMs(role); else if (VIEWS[v]) VIEWS[v](); else idle();
     return true;
   }
+  // A kept edit, back in the editor.
+  function loadEdited(id){
+    if (typeof edits[id] !== "string" || !byId[id]) return false;
+    src.value = edits[id];
+    syncName();
+    mark(null);
+    current = { id: id, edited: true };
+    settle();
+    syncMenu();
+    named();
+    saveDraft();
+    idle();
+    return true;
+  }
   sel.addEventListener("change", function(){
-    if (sel.value === MORE) { syncMenu(); location.href = MORE; return; }
-    if (sel.value) load(sel.value);
+    var v = sel.value;
+    if (v === MORE) { syncMenu(); location.href = MORE; return; }
+    if (v.indexOf("edited:") === 0) loadEdited(v.slice(7));
+    else if (v.indexOf("shown:") === 0) load(v.slice(6));
+    else if (v) load(v);
   });
   src.addEventListener("input", function(){
     if (!current) return;
-    if (!src.value.trim()) current = null; else settle();
+    if (!src.value.trim()) current = null; else { settle(); keepEdit(); }
     syncMenu();
     named();
     saveDraft();
