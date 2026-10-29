@@ -132,6 +132,7 @@ Figure 1 of the paper, for Exercise 4: its EFSMs, then its Erlang.
 
 ## Retry
 
+- title: 4-Retry
 - from: Figure 1
 
 Timeout, started again after each overrule. Step 4 runs its Erlang.
